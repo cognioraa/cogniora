@@ -101,107 +101,47 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    const body = JSON.parse(e?.postData?.contents || '{}');
+    var requestData = JSON.parse(e.postData.contents);
+    var action = requestData.action; 
+    var response = {};
 
-    const action = String(body.action || '').trim();
-    const args = Array.isArray(body.args) ? body.args : [];
-
-    const handlers = {
-      loginStudent,
-      loginAdmin,
-
-      validateSession,
-      validateAdminSession,
-      logoutSession,
-      logoutAdminSession,
-
-      registerLead,
-      verifyCertificatePublic,
-
-      getLandingImages,
-      getLandingImage,
-      getAboutLearningGallery,
-      getAboutLearningImage,
-
-      getDashboardData,
-      getMaterials,
-      getAssignments,
-      getSchedule,
-      getPayments,
-      getReports,
-      getCertificate,
-      getStudentProfile,
-      getStudentPhoto,
-      getMonthlyProgress,
-
-      acceptTermsOfService,
-
-      getAdminOverview,
-      getAdminLeads,
-      getAdminBatches,
-      getAdminStudents,
-      getAdminMaterials,
-      getAdminTasks,
-      getAdminTaskSubmissions,
-      getAdminAssignmentReview,
-      getAdminPayments,
-      getAdminSchedule,
-      getAdminReportBook,
-      getAdminCertificates,
-      getAdminCertificateConfig,
-
-      saveAdminBatch,
-      saveAdminMaterial,
-      saveAdminTask,
-      saveAdminSchedule,
-
-      assignStudentBatch,
-      updateStudentActiveStatus,
-
-      saveSubmissionGrade,
-      saveAdminCertificateConfig,
-      saveCertificateTemplateSettings,
-
-      generateCertificate,
-      generateCertificatesForBatch,
-      regenerateCertificate,
-      reissueCertificate,
-      revokeCertificate,
-
-      reviewPaymentProof,
-
-      saveReportAspect,
-      saveReportScores
-    };
-
-    if (!action || !handlers[action]) {
-      return jsonApi_({
-        success: false,
-        message: 'API action tidak diizinkan.'
-      });
+    if (action === "login") {
+      response = handleLogin(requestData);
+    } else if (action === "register") {
+      response = handleRegister(requestData);
+    } else {
+      response = { status: "error", message: "Aksi tidak valid." };
     }
 
-    const result = handlers[action](...args);
+    return ContentService
+      .createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
 
-    return jsonApi_(result);
-
-  } catch (err) {
-    console.error(err);
-
-    return jsonApi_({
-      success: false,
-      message: err_(err)
-    });
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function jsonApi_(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data ?? {
-      success: false,
-      message: 'Empty response.'
-    }))
-    .setMimeType(ContentService.MimeType.JSON);
+function handleLogin(data) {
+  // Logika login Google Sheets
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  var rows = sheet.getDataRange().getValues();
+  
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1] === data.email && rows[i][2] === data.password) { // Sesuaikan kolom email/password
+      return { status: "success", message: "Login Cogniora berhasil!" };
+    }
+  }
+  return { status: "error", message: "Email atau password salah." };
+}
+
+function handleRegister(data) {
+  // Logika register Google Sheets
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  sheet.appendRow([new Date(), data.email, data.password, data.nama]); 
+  return { status: "success", message: "Pendaftaran berhasil. Silakan login." };
 }
 
 
