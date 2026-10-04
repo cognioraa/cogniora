@@ -1878,7 +1878,13 @@ body { min-height:100vh; }
         google.script.run
           .withSuccessHandler(r=>{
             if(!r || !r.success || !r.data){
-              console.error('Landing images:', r?.message || 'Gagal memuat gambar Drive.');
+              const message=r?.message||'Gagal memuat gambar Drive.';
+              console.error('Landing images:', message);
+              targets.forEach(img=>{
+                if(!img.getAttribute('src')){
+                  img.alt=img.alt+' (gambar tidak dapat dimuat)';
+                }
+              });
               return;
             }
             targets.forEach(img=>{
@@ -3330,14 +3336,18 @@ body { min-height:100vh; }
         if (property in target) return target[property];
 
         return async function (...args) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
           try {
             const response = await fetch('/api', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json, text/plain, */*'
               },
               credentials: 'same-origin',
+              signal: controller.signal,
               body: JSON.stringify({
                 action: String(property),
                 args
@@ -3366,11 +3376,14 @@ body { min-height:100vh; }
             return result;
           } catch (error) {
             console.error('[COGNIORA API]', error);
+            const message = error?.name === 'AbortError'
+              ? 'Koneksi ke server terlalu lama. Periksa Vercel API /api dan deployment Apps Script.'
+              : (error?.message || 'Network error.');
             if (typeof state.failure === 'function') {
-              state.failure({
-                message: error?.message || 'Network error.'
-              });
+              state.failure({ message });
             }
+          } finally {
+            clearTimeout(timeoutId);
           }
         };
       }
