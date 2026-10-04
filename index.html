@@ -1873,28 +1873,38 @@ body { min-height:100vh; }
       },
 
       loadDriveImages(){
-        const targets=document.querySelectorAll('[data-drive-image]');
-        if(!targets.length || typeof google==='undefined' || !google.script || !google.script.run)return;
-        google.script.run
-          .withSuccessHandler(r=>{
-            if(!r || !r.success || !r.data){
-              const message=r?.message||'Gagal memuat gambar Drive.';
-              console.error('Landing images:', message);
-              targets.forEach(img=>{
-                if(!img.getAttribute('src')){
-                  img.alt=img.alt+' (gambar tidak dapat dimuat)';
-                }
+        const targets=[...document.querySelectorAll('[data-drive-image]')];
+        if(!targets.length)return;
+        if(typeof google==='undefined' || !google.script || !google.script.run){
+          console.error('Landing images: server runner tidak tersedia.');
+          return;
+        }
+
+        const requested=new Set();
+        targets.forEach(img=>{
+          const key=String(img.dataset.driveImage||'').trim().toLowerCase();
+          if(!key || requested.has(key))return;
+          requested.add(key);
+
+          google.script.run
+            .withSuccessHandler(r=>{
+              if(!r || !r.success || !r.data || !r.data.image){
+                const message=r?.message||('Gagal memuat gambar Drive: '+key);
+                console.error('Landing image '+key+':',message);
+                targets.filter(x=>String(x.dataset.driveImage||'').toLowerCase()===key).forEach(x=>{
+                  x.alt=(x.alt||'Gambar')+' (tidak dapat dimuat)';
+                });
+                return;
+              }
+              targets.filter(x=>String(x.dataset.driveImage||'').toLowerCase()===key).forEach(x=>{
+                x.src=r.data.image;
               });
-              return;
-            }
-            targets.forEach(img=>{
-              const key=img.dataset.driveImage;
-              const src=r.data[key];
-              if(src) img.src=src;
-            });
-          })
-          .withFailureHandler(err=>console.error('Landing images:', err?.message || err))
-          .getLandingImages();
+            })
+            .withFailureHandler(err=>{
+              console.error('Landing image '+key+':',err?.message||err);
+            })
+            .getLandingImage(key);
+        });
       },
 
       renderLearningGalleryImage(index){
@@ -1910,6 +1920,9 @@ body { min-height:100vh; }
         }
 
         stage.innerHTML='';
+        this.learningGalleryIndex=index;
+        count.textContent=(index+1)+' / '+(this.learningGalleryItems.length||5);
+        dots.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('active',i===index));
 
         const img=document.createElement('img');
         img.alt='Dokumentasi proses pembelajaran COGNIORA — foto '+(index+1);
@@ -1920,55 +1933,70 @@ body { min-height:100vh; }
         caption.className='learning-carousel-caption';
         caption.textContent=item.name||('Momen belajar '+String(index+1).padStart(2,'0'));
 
-        let fallbackStarted=false;
+        const cached=this.learningGalleryCache[index];
+        if(cached?.image){
+          img.src=cached.image;
+          stage.appendChild(img);
+          stage.appendChild(caption);
+          this.preloadLearningGalleryNeighbours_(index);
+          return;
+        }
 
-        img.onerror=()=>{
-          if(fallbackStarted)return;
-          fallbackStarted=true;
+        stage.innerHTML='<div class="learning-carousel-placeholder"><i class="bi bi-image"></i><br>Memuat foto...</div>';
 
-          if(typeof google==='undefined'||!google.script||!google.script.run){
-            stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat ditampilkan.</div>';
-            return;
-          }
+        if(typeof google==='undefined'||!google.script||!google.script.run){
+          stage.innerHTML='<div class="learning-carousel-placeholder">Server tidak tersedia.</div>';
+          return;
+        }
 
-          stage.innerHTML='<div class="learning-carousel-placeholder"><i class="bi bi-image"></i><br>Memuat foto...</div>';
+        const requestId=++this.learningGalleryRequestId;
+        google.script.run
+          .withSuccessHandler(r=>{
+            if(requestId!==this.learningGalleryRequestId)return;
+            if(!r||!r.success||!r.data||!r.data.image){
+              stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat ditampilkan.</div>';
+              return;
+            }
+
+            this.learningGalleryCache[index]=r.data;
+            this.learningGalleryItems[index]={...item,url:r.data.image};
+            stage.innerHTML='';
+            img.src=r.data.image;
+            stage.appendChild(img);
+            stage.appendChild(caption);
+            this.preloadLearningGalleryNeighbours_(index);
+          })
+          .withFailureHandler(err=>{
+            if(requestId!==this.learningGalleryRequestId)return;
+            console.error('Learning gallery:',err?.message||err);
+            stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat ditampilkan.<br><small>'+this.escape(err?.message||'Request gagal.')+'</small></div>';
+          })
+          .getAboutLearningImage(index);
+      },
+
+      preloadLearningGalleryNeighbours_(index){
+        if(!this.learningGalleryItems.length)return;
+        const total=this.learningGalleryItems.length;
+        const candidates=[(index+1)%total,(index-1+total)%total];
+        candidates.forEach(i=>{
+          if(this.learningGalleryCache[i])return;
+          if(!this._learningGalleryPreloading)this._learningGalleryPreloading=new Set();
+          if(this._learningGalleryPreloading.has(i))return;
+          this._learningGalleryPreloading.add(i);
 
           google.script.run
             .withSuccessHandler(r=>{
-              if(!r||!r.success||!r.data||!r.data.image){
-                stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat ditampilkan.</div>';
-                return;
+              this._learningGalleryPreloading.delete(i);
+              if(r?.success && r.data?.image){
+                this.learningGalleryCache[i]=r.data;
+                this.learningGalleryItems[i]={...(this.learningGalleryItems[i]||{}),url:r.data.image};
               }
-
-              this.learningGalleryCache[index]=r.data;
-              stage.innerHTML='';
-              img.src=r.data.image;
-              stage.appendChild(img);
-              stage.appendChild(caption);
             })
-            .withFailureHandler(err=>{
-              console.error('Learning gallery fallback:',err?.message||err);
-              stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat ditampilkan.</div>';
+            .withFailureHandler(()=>{
+              this._learningGalleryPreloading.delete(i);
             })
-            .getAboutLearningImage(index);
-        };
-
-        img.onload=()=>{
-          if(!stage.contains(caption))stage.appendChild(caption);
-        };
-
-        stage.appendChild(img);
-        img.src=item.url;
-
-        // Bila gambar sudah masuk cache browser, onload bisa selesai sangat cepat.
-        // Pastikan caption tetap tampil tanpa menunggu aksi pengguna.
-        if(img.complete && img.naturalWidth>0 && !stage.contains(caption)){
-          stage.appendChild(caption);
-        }
-
-        this.learningGalleryIndex=index;
-        count.textContent=(index+1)+' / '+(this.learningGalleryItems.length||5);
-        dots.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('active',i===index));
+            .getAboutLearningImage(i);
+        });
       },
 
       renderLearningGalleryDots(){
@@ -1989,12 +2017,11 @@ body { min-height:100vh; }
       },
 
       loadLearningGallery(){
-        if(this.learningGalleryLoaded||this.learningGalleryLoading){
-          if(this.learningGalleryLoaded && !document.hidden){
-            this.renderLearningGalleryImage(this.learningGalleryIndex);
-          }
+        if(this.learningGalleryLoaded){
+          this.renderLearningGalleryImage(this.learningGalleryIndex);
           return;
         }
+        if(this.learningGalleryLoading)return;
 
         const stage=document.getElementById('learningGalleryStage');
         if(!stage)return;
@@ -2004,7 +2031,7 @@ body { min-height:100vh; }
 
         if(typeof google==='undefined'||!google.script||!google.script.run){
           this.learningGalleryLoading=false;
-          stage.innerHTML='<div class="learning-carousel-placeholder">Google Apps Script tidak tersedia.</div>';
+          stage.innerHTML='<div class="learning-carousel-placeholder">Server tidak tersedia.</div>';
           return;
         }
 
@@ -2013,50 +2040,20 @@ body { min-height:100vh; }
             this.learningGalleryLoading=false;
 
             if(!r||!r.success||!r.data||!Array.isArray(r.data.items)||!r.data.items.length){
+              console.error('Learning gallery metadata:',r?.message||'Data gallery kosong.');
               stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat dimuat.</div>';
               return;
             }
 
-            this.learningGalleryItems=r.data.items;
+            this.learningGalleryItems=r.data.items.map(x=>({...x,url:''}));
             this.learningGalleryLoaded=true;
             this.renderLearningGalleryDots();
-
-            // Preload semua gambar segera setelah daftar gambar diterima.
-            // Foto pertama ditunggu sampai siap agar carousel tidak hanya menampilkan
-            // placeholder ketika halaman pertama kali dibuka.
-            this.learningGalleryPreload=this.learningGalleryItems.map((item,index)=>{
-              const image=new Image();
-              image.decoding='async';
-
-              image.onload=()=>{
-                // Setelah foto pertama siap, tampilkan otomatis tanpa aksi pengguna.
-                if(index===this.learningGalleryIndex && this.learningGalleryLoaded){
-                  this.renderLearningGalleryImage(index);
-                }
-              };
-
-              image.onerror=()=>{
-                // Biarkan renderLearningGalleryImage menjalankan fallback
-                // getAboutLearningImage(index) bila thumbnail gagal.
-                if(index===this.learningGalleryIndex && this.learningGalleryLoaded){
-                  this.renderLearningGalleryImage(index);
-                }
-              };
-
-              image.src=item.url;
-              return image;
-            });
-
-            // Jika browser sudah memiliki gambar pertama di cache, tampilkan sekarang.
-            const first=this.learningGalleryPreload[0];
-            if(first && first.complete && first.naturalWidth>0){
-              this.renderLearningGalleryImage(0);
-            }
+            this.renderLearningGalleryImage(this.learningGalleryIndex||0);
           })
           .withFailureHandler(err=>{
             this.learningGalleryLoading=false;
             console.error('Learning gallery:',err?.message||err);
-            stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat dimuat.</div>';
+            stage.innerHTML='<div class="learning-carousel-placeholder">Foto tidak dapat dimuat.<br><small>'+this.escape(err?.message||'Request gagal.')+'</small></div>';
           })
           .getAboutLearningGallery();
       },
@@ -3307,8 +3304,9 @@ body { min-height:100vh; }
 
   <script>
 (function () {
-  // GAS already provides google.script.run natively. Only create the
-  // Vercel adapter when the page is NOT running inside Google Apps Script.
+  // GAS already provides google.script.run natively. On Vercel, create a small
+  // compatibility layer so the existing application code can keep using the same
+  // API surface. This avoids maintaining a second version of every admin/student call.
   const hasNativeGasRunner = !!(
     window.google &&
     window.google.script &&
@@ -3317,16 +3315,22 @@ body { min-height:100vh; }
 
   if (hasNativeGasRunner) return;
 
-  function createRunner() {
-    const state = { success: null, failure: null };
+  const API_PATH = '/api';
+  const REQUEST_TIMEOUT_MS = 45000;
+
+  function createRunner(previous = {}) {
+    const state = {
+      success: previous.success || null,
+      failure: previous.failure || null
+    };
 
     const runner = {
       withSuccessHandler(fn) {
-        state.success = fn;
+        state.success = typeof fn === 'function' ? fn : null;
         return runner;
       },
       withFailureHandler(fn) {
-        state.failure = fn;
+        state.failure = typeof fn === 'function' ? fn : null;
         return runner;
       }
     };
@@ -3334,19 +3338,22 @@ body { min-height:100vh; }
     return new Proxy(runner, {
       get(target, property) {
         if (property in target) return target[property];
+        if (typeof property === 'symbol') return target[property];
 
         return async function (...args) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+          const started = performance.now();
 
           try {
-            const response = await fetch('/api', {
+            const response = await fetch(API_PATH, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json, text/plain, */*'
               },
               credentials: 'same-origin',
+              cache: 'no-store',
               signal: controller.signal,
               body: JSON.stringify({
                 action: String(property),
@@ -3355,19 +3362,29 @@ body { min-height:100vh; }
             });
 
             const raw = await response.text();
-            let result;
+            let result = null;
 
             try {
-              result = JSON.parse(raw);
+              result = JSON.parse(raw || '{}');
             } catch (error) {
               throw new Error(
-                'Server mengembalikan response bukan JSON: ' + raw.slice(0, 300)
+                `Response server bukan JSON (HTTP ${response.status}). ` +
+                String(raw || '').replace(/\\s+/g, ' ').slice(0, 500)
               );
             }
 
             if (!response.ok) {
-              throw new Error(result?.message || `HTTP ${response.status}`);
+              const detail = result?.detail ? ` ${result.detail}` : '';
+              throw new Error(
+                (result?.message || `HTTP ${response.status}.`) + detail
+              );
             }
+
+            console.debug(
+              '[COGNIORA API]',
+              String(property),
+              `${Math.round(performance.now() - started)}ms`
+            );
 
             if (typeof state.success === 'function') {
               state.success(result);
@@ -3375,13 +3392,22 @@ body { min-height:100vh; }
 
             return result;
           } catch (error) {
-            console.error('[COGNIORA API]', error);
+            console.error('[COGNIORA API]', String(property), error);
             const message = error?.name === 'AbortError'
-              ? 'Koneksi ke server terlalu lama. Periksa Vercel API /api dan deployment Apps Script.'
+              ? 'Request terlalu lama. Periksa koneksi Vercel ↔ Google Apps Script.'
               : (error?.message || 'Network error.');
+
             if (typeof state.failure === 'function') {
-              state.failure({ message });
+              state.failure({
+                message,
+                action: String(property),
+                originalError: error
+              });
             }
+
+            // google.script.run does not throw to the caller when a failure
+            // handler is attached. Preserve that behavior for this shim.
+            return undefined;
           } finally {
             clearTimeout(timeoutId);
           }
@@ -3399,6 +3425,8 @@ body { min-height:100vh; }
       }
     }
   };
+
+  window.COGNIORA_VERCEL = true;
 })();
   </script>
 

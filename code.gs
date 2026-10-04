@@ -60,6 +60,24 @@ function cacheKeyRows_(name){return 'cog:v'+COG_CACHE.VERSION+':rows:'+String(na
 function invalidateRowsCache_(name){const key=String(name||'');delete COG_RUNTIME.rows[key];try{CacheService.getScriptCache().remove(cacheKeyRows_(key));}catch(e){}}
 
 function doGet(e) {
+  // HTTP health endpoint used only by the Vercel proxy.
+  // Keep certificate verification and the normal GAS web app untouched.
+  try {
+    const apiMode = text_(e && e.parameter && e.parameter.api,40).toLowerCase();
+    if(apiMode === 'health'){
+      return jsonApi_({
+        success:true,
+        service:'COGNIORA Google Apps Script API',
+        status:'online',
+        version:'V40',
+        deploymentMode:'USER_DEPLOYING / ANYONE_ANONYMOUS'
+      });
+    }
+  }catch(err){
+    console.error('API health error:',err);
+    return jsonApi_({success:false,message:err_(err)});
+  }
+
   try {
     const no = text_(e && e.parameter && e.parameter.verify,120);
     if(no){
@@ -101,6 +119,7 @@ function doPost(e) {
       verifyCertificatePublic,
 
       getLandingImages,
+      getLandingImage,
       getAboutLearningGallery,
       getAboutLearningImage,
 
@@ -208,20 +227,21 @@ function getAboutLearningImage(index){
       index:i,
       total:COGNIORA_LEARNING_GALLERY_FILES.length,
       name:file.getName(),
+      mimeType:file.getBlob().getContentType()||'',
+      sizeBytes:file.getBlob().getBytes().length,
       image
     });
   }catch(e){
     console.error(e);
-    return fail_('Foto pembelajaran tidak dapat dimuat. Pastikan file Google Drive dapat diakses oleh akun pemilik Web App.');
+    return fail_('Foto pembelajaran tidak dapat dimuat: '+driveError_(e));
   }
 }
 
 function getAboutLearningGallery(){
   try{
-    // Jangan mengirim URL thumbnail Google Drive ke browser.
-    // Vercel/browser dapat menerima redirect/403 dari URL thumbnail Drive.
-    // Frontend akan meminta foto satu per satu melalui getAboutLearningImage(),
-    // yang mengubah file Drive menjadi data URL di sisi Apps Script.
+    // Return metadata only. The actual image is requested one-by-one through
+    // getAboutLearningImage() so a single large gallery response does not pass
+    // several base64 images through the Vercel function at once.
     const items=COGNIORA_LEARNING_GALLERY_FILES.map((fileId,index)=>({
       index,
       name:'Momen belajar '+String(index+1).padStart(2,'0'),
@@ -234,10 +254,9 @@ function getAboutLearningGallery(){
     });
   }catch(e){
     console.error(e);
-    return fail_('Daftar foto pembelajaran tidak dapat dimuat.');
+    return fail_('Daftar foto pembelajaran tidak dapat dimuat: '+err_(e));
   }
 }
-
 
 /**
  * Diagnostic helper for landing-page Drive assets.
@@ -267,19 +286,48 @@ function testLandingAssets(){
   }
 }
 
+const COGNIORA_LANDING_FILES = Object.freeze({
+  logo: '1aPg0foc5qygX-VqGpFlQ0kn1Ogbb52iT',
+  hero: '1Vo4IeV5NMGkzEPA7z1UeiTHwkbiJWjm2'
+});
+
+function getLandingImage(key) {
+  try {
+    const name = String(key || '').trim().toLowerCase();
+    const fileId = COGNIORA_LANDING_FILES[name];
+    if(!fileId) return fail_('Aset landing tidak dikenal.');
+
+    const file = DriveApp.getFileById(fileId);
+    const blob = file.getBlob();
+    const bytes = blob.getBytes();
+
+    return ok_('Gambar landing berhasil dimuat.', {
+      key:name,
+      name:file.getName(),
+      mimeType:blob.getContentType() || 'application/octet-stream',
+      sizeBytes:bytes.length,
+      image:'data:'+(blob.getContentType() || 'application/octet-stream')+';base64,'+Utilities.base64Encode(bytes)
+    });
+  } catch(e) {
+    console.error('getLandingImage:',e);
+    return fail_('Gambar landing tidak dapat dimuat: '+driveError_(e));
+  }
+}
+
 function getLandingImages() {
   try {
-    const ids = {
-      logo: '1aPg0foc5qygX-VqGpFlQ0kn1Ogbb52iT',
-      hero: '1Vo4IeV5NMGkzEPA7z1UeiTHwkbiJWjm2'
-    };
-    return ok_('Gambar landing page berhasil dimuat.', {
-      logo: driveFileDataUrl_(ids.logo),
-      hero: driveFileDataUrl_(ids.hero)
+    // Backward-compatible GAS method. For Vercel, the frontend now prefers
+    // getLandingImage() one file at a time to keep response payloads smaller.
+    const result = {};
+    Object.keys(COGNIORA_LANDING_FILES).forEach(key => {
+      const item = getLandingImage(key);
+      if(!item || !item.success) throw new Error(item?.message || ('Gagal memuat '+key));
+      result[key] = item.data.image;
     });
+    return ok_('Gambar landing page berhasil dimuat.', result);
   } catch (e) {
     console.error(e);
-    return fail_('Gambar landing page tidak dapat dimuat. Pastikan file Drive dapat diakses oleh akun pemilik Web App.');
+    return fail_('Gambar landing page tidak dapat dimuat: '+driveError_(e));
   }
 }
 
