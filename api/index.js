@@ -1,176 +1,239 @@
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzHiYkCDnZ5ANRRbR2VCa---jxqS9PxyZ7CmVV5hyfZx9UBq1dT6fUvoBh2J26JKqnPkA/exec';
-const UPSTREAM_TIMEOUT_MS = 45000;
+/**
+ * COGNIORA Vercel API Proxy
+ * -----------------------------------------
+ * Browser -> /api -> this Vercel Function -> Google Apps Script /exec
+ *
+ * Required Vercel Environment Variable:
+ *   GAS_WEBAPP_URL = https://script.google.com/macros/s/DEPLOYMENT_ID/exec
+ *
+ * No Google credential is exposed to the browser.
+ */
 
-function json(res, status, body) {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('X-Cogniora-API', 'vercel-proxy-v4');
-  return res.status(status).json(body);
+const ALLOWED_ACTIONS = new Set([
+  // Public / landing
+  "registerLead",
+  "getLandingImages",
+  "getAboutLearningGallery",
+  "getAboutLearningImage",
+  "verifyCertificatePublic",
+
+  // Student auth/session
+  "loginStudent",
+  "validateSession",
+  "logoutSession",
+  "acceptTermsOfService",
+
+  // Student
+  "getDashboardData",
+  "getMaterials",
+  "getAssignments",
+  "getSchedule",
+  "getPayments",
+  "getReports",
+  "getMonthlyProgress",
+  "getCertificate",
+  "getCertificatePdf",
+  "getStudentProfile",
+  "getStudentPhoto",
+  "searchStudentContent",
+
+  // Admin auth/session
+  "loginAdmin",
+  "validateAdminSession",
+  "logoutAdminSession",
+
+  // Admin overview / CRM
+  "getAdminOverview",
+  "getAdminLeads",
+  "getAdminBatches",
+  "getAdminStudents",
+  "getAdminMaterials",
+  "getAdminTasks",
+  "getAdminAssignmentReview",
+  "getAdminTaskSubmissions",
+  "getAdminSchedule",
+  "getAdminPayments",
+  "getAdminReportBook",
+
+  // Admin mutations
+  "convertLeadsToStudents",
+  "assignStudentBatch",
+  "updateStudentActiveStatus",
+  "saveAdminBatch",
+  "saveAdminMaterial",
+  "saveAdminTask",
+  "saveAdminSchedule",
+  "saveSubmissionGrade",
+  "reviewPaymentProof",
+  "saveReportAspect",
+  "saveReportScores",
+
+  // Certificates / Google Docs
+  "getAdminCertificates",
+  "getAdminCertificateConfig",
+  "saveCertificateTemplateSettings",
+  "authorizeGoogleDocsAccess",
+  "validateCertificateTemplate",
+  "generateCertificate",
+  "generateCertificatesForBatch",
+  "regenerateCertificate",
+  "reissueCertificate",
+  "revokeCertificate",
+
+  // Student profile image
+  // These are included for API compatibility. The current
+  // HTML-form Blob upload needs a separate upload transport.
+  "saveStudentProfilePhoto",
+
+  // Existing assignment/payment functions.
+  // See README: file uploads need a separate route because
+  // Vercel Function request bodies are size-limited.
+  "submitAssignment",
+  "uploadPaymentProof"
+]);
+
+function sendJson(response, status, payload) {
+  response.status(status);
+  response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  response.setHeader("Pragma", "no-cache");
+  response.json(payload);
 }
 
-async function readBody(req) {
-  if (req.body !== undefined && req.body !== null) {
-    if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-    if (typeof req.body === 'object') return req.body;
-  }
-
-  let raw = '';
-  for await (const chunk of req) raw += chunk;
-  return JSON.parse(raw || '{}');
-}
-
-async function fetchWithTimeout(url, options = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+function getBody(request) {
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      redirect: 'follow',
-      cache: 'no-store'
-    });
-  } finally {
-    clearTimeout(timer);
+    if (request && request.body != null) {
+      return typeof request.body === "string"
+        ? JSON.parse(request.body)
+        : request.body;
+    }
+  } catch (e) {
+    throw new Error("JSON request body tidak valid.");
   }
+  return {};
 }
 
-async function parseUpstreamJson(response) {
-  const raw = await response.text();
-  const contentType = response.headers.get('content-type') || '';
+async function readUpstreamResponse(upstream) {
+  const text = await upstream.text();
 
-  let data = null;
   try {
-    data = JSON.parse(raw);
-  } catch (error) {
-    const preview = String(raw || '').replace(/\\s+/g, ' ').slice(0, 500);
-    throw new Error(
-      `Google Apps Script mengembalikan response bukan JSON. HTTP ${response.status}. ` +
-      `Content-Type: ${contentType || '(kosong)'}. Preview: ${preview || '(empty)'}`
-    );
+    return {
+      ok: true,
+      data: JSON.parse(text),
+      raw: text
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      data: null,
+      raw: text
+    };
   }
-
-  return { data, raw, contentType };
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
-  res.setHeader('Vary', 'Origin');
+export default async function handler(request, response) {
+  // Health check:
+  // https://your-domain.vercel.app/api?api=health
+  if (request.method === "GET") {
+    const url = new URL(request.url);
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
-
-  // GET /api = real upstream health check. This is deliberately not a local
-  // "online" response, so it can distinguish Vercel availability from GAS availability.
-  if (req.method === 'GET') {
-    try {
-      const upstream = await fetchWithTimeout(`${GAS_URL}?api=health`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json, text/plain, */*' }
-      });
-      const { data, contentType } = await parseUpstreamJson(upstream);
-
-      return json(res, upstream.ok ? 200 : 502, {
-        success: upstream.ok && data?.success !== false,
-        service: 'COGNIORA Vercel API',
-        proxy: 'online',
-        gas: data,
-        upstreamStatus: upstream.status,
-        upstreamContentType: contentType || null,
-        gasUrlConfigured: Boolean(GAS_URL)
-      });
-    } catch (error) {
-      console.error('COGNIORA API health check error:', error);
-      return json(res, 502, {
-        success: false,
-        service: 'COGNIORA Vercel API',
-        proxy: 'online',
-        gas: 'unreachable',
-        message: error?.name === 'AbortError'
-          ? 'Google Apps Script tidak merespons dalam batas waktu.'
-          : 'Vercel tidak dapat menghubungi Google Apps Script.',
-        detail: error?.message || 'Upstream health check failed.'
+    if (url.searchParams.get("api") === "health") {
+      return sendJson(response, 200, {
+        success: true,
+        service: "cogniora-vercel-api",
+        status: "healthy",
+        time: new Date().toISOString()
       });
     }
-  }
 
-  if (req.method !== 'POST') {
-    return json(res, 405, {
-      success: false,
-      message: 'Method not allowed.'
+    return sendJson(response, 200, {
+      success: true,
+      service: "cogniora-vercel-api",
+      message: "Use POST /api for Cogniora actions."
     });
   }
 
-  let payload;
+  if (request.method !== "POST") {
+    return sendJson(response, 405, {
+      success: false,
+      message: "Method tidak diizinkan."
+    });
+  }
+
+  const gasUrl = String(process.env.GAS_WEBAPP_URL || "").trim();
+
+  if (!gasUrl) {
+    return sendJson(response, 500, {
+      success: false,
+      message: "GAS_WEBAPP_URL belum dikonfigurasi di Vercel."
+    });
+  }
+
+  let body;
+
   try {
-    payload = await readBody(req);
-  } catch (error) {
-    return json(res, 400, {
+    body = getBody(request);
+  } catch (err) {
+    return sendJson(response, 400, {
       success: false,
-      message: 'Request body JSON tidak valid.',
-      detail: error?.message || 'Invalid JSON body.'
+      message: err.message
     });
   }
 
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return json(res, 400, {
-      success: false,
-      message: 'Request body tidak valid.'
-    });
-  }
-
-  const action = String(payload.action || '').trim();
-  const args = Array.isArray(payload.args) ? payload.args : [];
+  const action = String(body?.action || "").trim();
+  const args = Array.isArray(body?.args) ? body.args : [];
 
   if (!action) {
-    return json(res, 400, {
+    return sendJson(response, 400, {
       success: false,
-      message: 'Action API tidak boleh kosong.'
+      message: "Action API belum diisi."
     });
   }
 
-  console.log('[COGNIORA API] forwarding action:', action, 'args:', args.length);
+  if (!ALLOWED_ACTIONS.has(action)) {
+    return sendJson(response, 400, {
+      success: false,
+      message: `Action API tidak diizinkan: ${action}`
+    });
+  }
 
   try {
-    // text/plain avoids unnecessary browser/CORS semantics and is fully readable
-    // by Apps Script through e.postData.contents.
-    const upstream = await fetchWithTimeout(GAS_URL, {
-      method: 'POST',
+    const upstream = await fetch(gasUrl, {
+      method: "POST",
+      redirect: "follow",
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
-        'Accept': 'application/json, text/plain, */*'
+        "Content-Type": "application/json",
+        "Accept": "application/json"
       },
-      body: JSON.stringify({ action, args })
+      body: JSON.stringify({
+        action,
+        args
+      })
     });
 
-    const { data, contentType } = await parseUpstreamJson(upstream);
-    const upstreamSuccess = data?.success !== false;
+    const parsed = await readUpstreamResponse(upstream);
 
-    if (!upstream.ok) {
-      return json(res, 502, {
+    if (!parsed.ok) {
+      console.error("Apps Script returned non-JSON:", parsed.raw.slice(0, 1000));
+
+      return sendJson(response, 502, {
         success: false,
-        message: data?.message || `Google Apps Script HTTP ${upstream.status}.`,
+        message: "Apps Script tidak mengembalikan JSON.",
         upstreamStatus: upstream.status,
-        upstreamContentType: contentType || null,
-        gas: data
+        upstreamPreview: parsed.raw.slice(0, 500)
       });
     }
 
-    // Apps Script can return HTTP 200 with {success:false}; preserve that result
-    // so the frontend receives the actual business error instead of a generic 502.
-    return json(res, upstreamSuccess ? 200 : 200, data);
-  } catch (error) {
-    console.error('COGNIORA API proxy error:', error);
+    // Keep the application's own success:false as HTTP 200.
+    // The current Cogniora frontend handles r.success itself.
+    return sendJson(response, 200, parsed.data);
 
-    return json(res, 502, {
+  } catch (err) {
+    console.error("GAS proxy error:", err);
+
+    return sendJson(response, 502, {
       success: false,
-      message: error?.name === 'AbortError'
-        ? 'Request ke Google Apps Script timeout.'
-        : 'Vercel tidak dapat menghubungi Google Apps Script.',
-      detail: error?.message || 'Upstream request failed.',
-      action
+      message: "Gagal menghubungi Google Apps Script.",
+      detail: err?.message || String(err)
     });
   }
 }

@@ -105,6 +105,145 @@ function doPost(e) {
     var action = requestData.action; 
     var response = {};
 
+    if (!action) {
+      return jsonApiResponse_({
+        success: false,
+        message: 'API action belum diisi.'
+      });
+    }
+
+    const handler = COG_API_HANDLERS_[action];
+
+    if (typeof handler !== 'function') {
+      return jsonApiResponse_({
+        success: false,
+        message: 'API action tidak diizinkan: ' + action
+      });
+    }
+
+    const result = handler.apply(null, args);
+
+    return jsonApiResponse_(
+      result || {
+        success: false,
+        message: 'API tidak mengembalikan hasil.'
+      }
+    );
+
+  } catch (err) {
+    console.error('doPost error', err);
+
+    return jsonApiResponse_({
+      success: false,
+      message: 'API server error: ' + err_(err)
+    });
+  }
+}
+
+function jsonApiResponse_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload || {}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/*
+ * SECURITY:
+ * Hanya fungsi yang tercantum di bawah yang boleh dipanggil
+ * melalui internet.
+ *
+ * Fungsi internal seperti:
+ *   getDb_
+ *   rows_
+ *   update_
+ *   createSession_
+ *   requireSession_
+ * dst.
+ * TIDAK dimasukkan ke whitelist.
+ */
+const COG_API_HANDLERS_ = {
+
+  /* Public / landing */
+  registerLead,
+  getLandingImages,
+  getAboutLearningGallery,
+  getAboutLearningImage,
+  verifyCertificatePublic,
+
+  /* Student authentication */
+  loginStudent,
+  validateSession,
+  logoutSession,
+  acceptTermsOfService,
+
+  /* Student */
+  getDashboardData,
+  getMaterials,
+  getAssignments,
+  getSchedule,
+  getPayments,
+  getReports,
+  getMonthlyProgress,
+  getCertificate,
+  getCertificatePdf,
+  getStudentProfile,
+  getStudentPhoto,
+  searchStudentContent,
+
+  /* Admin authentication */
+  loginAdmin,
+  validateAdminSession,
+  logoutAdminSession,
+
+  /* Admin read */
+  getAdminOverview,
+  getAdminLeads,
+  getAdminBatches,
+  getAdminStudents,
+  getAdminMaterials,
+  getAdminTasks,
+  getAdminAssignmentReview,
+  getAdminTaskSubmissions,
+  getAdminSchedule,
+  getAdminPayments,
+  getAdminReportBook,
+  getAdminCertificates,
+  getAdminCertificateConfig,
+
+  /* Admin write */
+  convertLeadsToStudents,
+  assignStudentBatch,
+  updateStudentActiveStatus,
+  saveAdminBatch,
+  saveAdminMaterial,
+  saveAdminTask,
+  saveAdminSchedule,
+  saveSubmissionGrade,
+  reviewPaymentProof,
+  saveReportAspect,
+  saveReportScores,
+
+  /* Certificate / Google Docs */
+  saveCertificateTemplateSettings,
+  authorizeGoogleDocsAccess,
+  validateCertificateTemplate,
+  generateCertificate,
+  generateCertificatesForBatch,
+  regenerateCertificate,
+  reissueCertificate,
+  revokeCertificate,
+
+  /*
+   * Compatibility names currently used by the old UI.
+   * These three methods receive HTML Form / Blob in the old
+   * Apps Script client and therefore need a separate upload
+   * implementation on Vercel for real file uploads.
+   */
+  saveStudentProfilePhoto,
+  submitAssignment,
+  uploadPaymentProof
+};
+
     if (action === "login") {
       response = handleLogin(requestData);
     } else if (action === "register") {

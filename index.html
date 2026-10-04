@@ -3430,6 +3430,133 @@ body { min-height:100vh; }
 })();
   </script>
 
+/**
+ * COGNIORA Browser -> Vercel API bridge
+ *
+ * Put this script BEFORE App is initialized.
+ * It intentionally keeps the existing google.script.run syntax so that
+ * the current Cogniora UI does not need 70+ manual rewrites immediately.
+ *
+ * Example existing code:
+ *
+ * google.script.run
+ *   .withSuccessHandler(...)
+ *   .withFailureHandler(...)
+ *   .getLandingImages();
+ *
+ * becomes:
+ *
+ * POST /api
+ * {
+ *   "action": "getLandingImages",
+ *   "args": []
+ * }
+ */
+
+(function installCognioraApiBridge () {
+
+  function createRunner () {
+
+    let successHandler = null;
+    let failureHandler = null;
+
+    const runner = new Proxy({}, {
+      get(_target, property) {
+
+        if (property === "withSuccessHandler") {
+          return function (fn) {
+            successHandler = typeof fn === "function" ? fn : null;
+            return runner;
+          };
+        }
+
+        if (property === "withFailureHandler") {
+          return function (fn) {
+            failureHandler = typeof fn === "function" ? fn : null;
+            return runner;
+          };
+        }
+
+        // Every other property is treated as a backend action.
+        return async function (...args) {
+
+          const action = String(property);
+
+          try {
+
+            const response = await fetch("/api", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              credentials: "same-origin",
+              body: JSON.stringify({
+                action,
+                args
+              })
+            });
+
+            const raw = await response.text();
+
+            let result;
+
+            try {
+              result = JSON.parse(raw);
+            } catch (parseError) {
+              throw new Error(
+                `API ${action} mengembalikan response non-JSON: ` +
+                raw.slice(0, 300)
+              );
+            }
+
+            if (!response.ok) {
+              throw new Error(
+                result?.message ||
+                `API ${action} gagal dengan HTTP ${response.status}.`
+              );
+            }
+
+            if (successHandler) {
+              successHandler(result);
+            }
+
+            return result;
+
+          } catch (error) {
+
+            console.error(
+              `[COGNIORA API] ${action}:`,
+              error
+            );
+
+            if (failureHandler) {
+              failureHandler({
+                message:
+                  error?.message ||
+                  `API ${action} gagal.`
+              });
+            }
+          }
+        };
+      }
+    });
+
+    return runner;
+  }
+
+  // Replace the Apps Script client API in the Vercel browser.
+  window.google = {
+    script: {
+      get run () {
+        return createRunner();
+      }
+    }
+  };
+
+})();
+
+
   <script>
     window.App = App;
     document.addEventListener('DOMContentLoaded', () => App.init());
