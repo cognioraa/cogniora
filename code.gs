@@ -98,6 +98,7 @@ function doPost(e) {
       logoutAdminSession,
 
       registerLead,
+      verifyCertificatePublic,
 
       getLandingImages,
       getAboutLearningGallery,
@@ -217,10 +218,14 @@ function getAboutLearningImage(index){
 
 function getAboutLearningGallery(){
   try{
+    // Jangan mengirim URL thumbnail Google Drive ke browser.
+    // Vercel/browser dapat menerima redirect/403 dari URL thumbnail Drive.
+    // Frontend akan meminta foto satu per satu melalui getAboutLearningImage(),
+    // yang mengubah file Drive menjadi data URL di sisi Apps Script.
     const items=COGNIORA_LEARNING_GALLERY_FILES.map((fileId,index)=>({
       index,
       name:'Momen belajar '+String(index+1).padStart(2,'0'),
-      url:'https://drive.google.com/thumbnail?id='+encodeURIComponent(fileId)+'&sz=w1400'
+      fileId:String(fileId)
     }));
 
     return ok_('Daftar foto pembelajaran berhasil dimuat.',{
@@ -230,6 +235,35 @@ function getAboutLearningGallery(){
   }catch(e){
     console.error(e);
     return fail_('Daftar foto pembelajaran tidak dapat dimuat.');
+  }
+}
+
+
+/**
+ * Diagnostic helper for landing-page Drive assets.
+ * Run this manually once from the Apps Script editor after authorizing Drive.
+ */
+function testLandingAssets(){
+  try{
+    const ids={
+      logo:'1aPg0foc5qygX-VqGpFlQ0kn1Ogbb52iT',
+      hero:'1Vo4IeV5NMGkzEPA7z1UeiTHwkbiJWjm2'
+    };
+    const result={success:true,files:{}};
+    Object.keys(ids).forEach(key=>{
+      const file=DriveApp.getFileById(ids[key]);
+      const blob=file.getBlob();
+      result.files[key]={
+        id:ids[key],
+        name:file.getName(),
+        mimeType:blob.getContentType()||'',
+        size:blob.getBytes().length,
+        url:file.getUrl()
+      };
+    });
+    return result;
+  }catch(e){
+    return {success:false,message:driveError_(e)};
   }
 }
 

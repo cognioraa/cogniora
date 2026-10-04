@@ -12,7 +12,7 @@
 <body>
   <div class="wrap"><div class="card" id="app"><div class="brand"><img src="" id="logo" alt="COGNIORA"><div class="title">Certificate Verification</div></div><div id="content">Verifying certificate...</div></div></div>
   <script>
-    const VERIFY_NO = <?!= JSON.stringify(verifyNo || '') ?>;
+    const VERIFY_NO = new URLSearchParams(window.location.search).get('verify') || '';
     function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;')}
     function render(d){
       const c=document.getElementById('content');
@@ -22,25 +22,21 @@
         '<div class="grid"><div class="field"><small>Certificate No.</small><strong>'+esc(x.certificateNo)+'</strong></div><div class="field"><small>Issued</small><strong>'+esc(x.issuedAt)+'</strong></div><div class="field"><small>Student</small><strong>'+esc(x.studentName)+'</strong></div><div class="field"><small>Program</small><strong>'+esc(x.program)+'</strong></div><div class="field"><small>Level</small><strong>'+esc(x.level)+'</strong></div><div class="field"><small>Batch</small><strong>'+esc(x.batchName)+'</strong></div></div>'+ 
         '<div class="foot">COGNIORA · Learning, Progress, and Growth.</div>';
     }
-    google.script.run.withSuccessHandler(render).withFailureHandler(err=>render({success:false,message:err?.message||'Server error.'})).verifyCertificatePublic(VERIFY_NO);
+    fetch('/api', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({action:'verifyCertificatePublic',args:[VERIFY_NO]})
+    })
+    .then(async response=>{
+      const text=await response.text();
+      let data={};
+      try{data=JSON.parse(text);}catch(e){throw new Error('Server mengembalikan response yang bukan JSON.');}
+      if(!response.ok)throw new Error(data?.message||('HTTP '+response.status));
+      return data;
+    })
+    .then(render)
+    .catch(err=>render({success:false,message:err?.message||'Server error.'}));
   </script>
 </body>
 </html>
-fetch('/api', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    action: 'verifyCertificatePublic',
-    args: [VERIFY_NO]
-  })
-})
-.then(r => r.json())
-.then(render)
-.catch(err => {
-  render({
-    success: false,
-    message: err.message
-  });
-});

@@ -3297,112 +3297,101 @@ body { min-height:100vh; }
       dayLabel(s){const d=String(s||'').split('/');return d.length>1?d[0]+'/'+d[1]:'DAY'},
       materialIcon(c){return c==='VIDEO'?'bi-play-circle':c==='AUDIO'?'bi-headphones':c==='PDF'?'bi-file-earmark-pdf':'bi-journal-text'}
     };
+  </script>
 
-<script>
+  <script>
 (function () {
+  // GAS already provides google.script.run natively. Only create the
+  // Vercel adapter when the page is NOT running inside Google Apps Script.
+  const hasNativeGasRunner = !!(
+    window.google &&
+    window.google.script &&
+    window.google.script.run
+  );
+
+  if (hasNativeGasRunner) return;
 
   function createRunner() {
-
-    const state = {
-      success: null,
-      failure: null
-    };
+    const state = { success: null, failure: null };
 
     const runner = {
-
       withSuccessHandler(fn) {
         state.success = fn;
         return runner;
       },
-
       withFailureHandler(fn) {
         state.failure = fn;
         return runner;
       }
-
     };
 
     return new Proxy(runner, {
-
       get(target, property) {
-
-        if (property in target) {
-          return target[property];
-        }
+        if (property in target) return target[property];
 
         return async function (...args) {
-
           try {
-
             const response = await fetch('/api', {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
               },
+              credentials: 'same-origin',
               body: JSON.stringify({
-                action: property,
-                args: args
+                action: String(property),
+                args
               })
             });
 
-            const text = await response.text();
-
+            const raw = await response.text();
             let result;
 
             try {
-              result = JSON.parse(text);
-            } catch (err) {
+              result = JSON.parse(raw);
+            } catch (error) {
               throw new Error(
-                'Server mengembalikan response yang bukan JSON.'
+                'Server mengembalikan response bukan JSON: ' + raw.slice(0, 300)
               );
             }
 
             if (!response.ok) {
-              throw new Error(
-                result?.message ||
-                `HTTP ${response.status}`
-              );
+              throw new Error(result?.message || `HTTP ${response.status}`);
             }
 
-            // Meniru perilaku google.script.run:
-            // response aplikasi tetap masuk success handler
-            // meskipun result.success === false.
             if (typeof state.success === 'function') {
               state.success(result);
             }
 
             return result;
-
           } catch (error) {
-
+            console.error('[COGNIORA API]', error);
             if (typeof state.failure === 'function') {
               state.failure({
                 message: error?.message || 'Network error.'
               });
-            } else {
-              console.error(error);
             }
-
           }
         };
       }
-
     });
   }
 
   window.google = {
+    ...(window.google || {}),
     script: {
+      ...(window.google?.script || {}),
       get run() {
         return createRunner();
       }
     }
   };
-
 })();
-</script>
+  </script>
 
-    window.App=App;
-    document.addEventListener('DOMContentLoaded',()=>App.init());
+  <script>
+    window.App = App;
+    document.addEventListener('DOMContentLoaded', () => App.init());
   </script>
 </body>
 </html>
