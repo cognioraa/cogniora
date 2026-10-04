@@ -1,4 +1,4 @@
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzLLhQ8Vcn1sEljXtGrGkafmLQf26FcYPT2HA9HR9RGB5HtpA5OHm_KuqNgFy2ogBGR8w/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzHiYkCDnZ5ANRRbR2VCa---jxqS9PxyZ7CmVV5hyfZx9UBq1dT6fUvoBh2J26JKqnPkA/exec';
 const UPSTREAM_TIMEOUT_MS = 45000;
 
 function json(res, status, body) {
