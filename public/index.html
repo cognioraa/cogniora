@@ -1644,7 +1644,7 @@ html,body{overflow-x:hidden}
   .admin-filter{flex-wrap:nowrap;overflow-x:auto}
   .page-head{height:auto!important}
   /* Penyebab utama tumpang-tindih: flex-basis 260px berubah jadi TINGGI 260px saat panel bertumpuk vertikal */
-  .admin-panel-head>*,.page-head>*,.section-title>*{flex:0 0 auto!important;min-width:0}
+  .admin-panel-head>*,.page-head>*,.section-title>*{flex:0 1 auto!important;min-width:0;max-width:100%}
   .invoice-summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   .invoice-pick-table th{white-space:nowrap}
 }
@@ -1710,6 +1710,33 @@ html,body{overflow-x:hidden}
 .v37-ach-ph{display:grid;place-items:center;background:#fff3d6;color:#d99a00;font-size:22px}
 .v37-locked-note{margin-top:14px;padding:12px 14px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);font-size:13px}
 @media (max-width:767px){.v37-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.v37-month>summary{padding:12px}}
+
+/* ===================== V40: font HP sedikit lebih kecil ===================== */
+.class-item.is-history{opacity:.72}
+.class-item.is-history .item-title{color:var(--muted)}
+@media (max-width:767px){
+  body{font-size:13.5px}
+  .main h1,.admin-main h1,.page-head h1,.welcome-card h1,.admin-topbar h1{font-size:21px!important}
+  .main h2,.admin-main h2,.section-title h2,.admin-panel-head h2{font-size:16.5px!important}
+  .main h3,.admin-main h3{font-size:14.5px!important}
+  .main p,.admin-main p,.main .muted,.admin-main .muted{font-size:12.5px!important}
+  .main .btn,.admin-main .btn,.modal .btn{font-size:12.5px!important}
+  .main .tag,.admin-main .tag,.status-pill{font-size:10.5px!important}
+  .kpi strong,.admin-kpi strong,.v37-stats strong{font-size:21px!important}
+  .kpi small,.v37-stats small{font-size:11.5px!important}
+  .item-title{font-size:13.5px!important}
+  .data-table th{font-size:10.5px!important}
+  .data-table td{font-size:12.5px!important}
+  .welcome-card p{font-size:12.5px!important}
+  .main-header input,.search input{font-size:14px!important}
+  .landing h1,.hero h1{font-size:28px!important}
+  .landing h2,.section h2{font-size:21px!important}
+  .landing p,.hero p{font-size:14px!important}
+}
+
+/* V41: dropdown Month di Learning Sources */
+.source-subhead{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.learning-month-select{width:auto;min-width:130px;padding:8px 34px 8px 12px;font-weight:700}
 </style>
 
 </head>
@@ -2356,7 +2383,7 @@ const App = {
   async deleteBatch(id){if(!confirm('Hapus batch ini? Batch yang sudah memiliki enrollment tidak dapat dihapus.'))return;try{const r=await this.call('admin.batch.delete',{id},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Batch dihapus.','success');await this.loadAdminBatches()}catch(e){this.toast(e.message,'error')}},
   async openBatchSyllabus(batchId){try{const r=await this.call('admin.batch.syllabus',{batch_id:batchId,mode:'list'},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));const rows=r.data||[];this.modalTitle('Batch Syllabus');this.modalBody(`<div class="admin-result-list">${rows.map(x=>`<div class="admin-result"><strong>Month ${x.Month_No} • ${this.escape(x.Topik)}</strong><div class="muted">${this.escape(x.Learning_Objective||'')}</div></div>`).join('')||'<div class="empty">No syllabus entries.</div>'}</div><form id="batchSyllabusForm" style="margin-top:14px"><input type="hidden" name="batch_id" value="${this.escapeAttr(batchId)}"><div class="score-grid"><div class="score-card"><label>Month</label><input class="input" type="number" min="1" name="month_no" value="1"></div><div class="score-card"><label>Order</label><input class="input" type="number" min="1" name="order_no" value="1"></div></div><div class="form-group"><label>Topic</label><input class="input" name="topic" required></div><div class="form-group"><label>Learning Objective</label><textarea class="input" name="learning_objective" rows="3"></textarea></div><button class="btn btn-primary" type="submit">Add Topic</button></form>`);this.openModal();document.getElementById('batchSyllabusForm').addEventListener('submit',async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.currentTarget).entries());d.is_customized=true;const r=await this.call('admin.batch.syllabus',d,this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Syllabus topic added.','success');await this.openBatchSyllabus(batchId)}catch(err){this.toast(err.message,'error')}})}catch(e){this.toast(e.message,'error')}},
 
-  async loadAdminStudents(){this.renderAdminLoading('admin-view-students');try{const b=await this.call('admin.batches',{},this.adminToken);this.adminData.batches=b.success?b.data||[]:[];const current=document.getElementById('studentBatchSelect')?.value||this.adminData.batches[0]?.id||'';const r=await this.call('admin.students',{batch_id:current},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.adminData.students=r.data||[];document.getElementById('admin-view-students').innerHTML=`<div class="admin-panel"><div class="admin-panel-head"><div><h2>Students</h2><p>Pilih batch untuk melihat siswa per batch.</p></div><select id="studentBatchSelect" class="input" onchange="App.loadAdminStudents()"><option value="">Pilih batch</option>${this.adminData.batches.map(x=>`<option value="${this.escapeAttr(x.id)}" ${x.id===current?'selected':''}>${this.escape(x.name)}</option>`).join('')}</select></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Status</th><th>Month</th><th>Meeting</th><th>Completion</th><th>Action</th></tr></thead><tbody>${this.adminData.students.map(x=>`<tr><td><strong>${this.escape(x.name)}</strong><div class="muted">${this.escape(x.student_id)} • ${this.escape(x.email)}</div></td><td><select class="input" onchange="App.changeStudentStatus('${this.escapeAttr(x.enrollment_id)}',this.value)"><option value="ACTIVE" ${x.status==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${x.status==='INACTIVE'?'selected':''}>INACTIVE</option><option value="COMPLETED" ${x.status==='COMPLETED'?'selected':''}>COMPLETED</option><option value="CANCELLED" ${x.status==='CANCELLED'?'selected':''}>CANCELLED</option></select></td><td>${x.month}</td><td>${x.meeting}</td><td>${this.escape(x.completion_status)}</td><td><button class="btn btn-light" onclick="App.openStudentDetail('${this.escapeAttr(x.student_id)}')">Detail</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="admin-empty">Tidak ada siswa dalam batch ini.</div></td></tr>'}</tbody></table></div></div>`}catch(e){this.showAdminError('admin-view-students',e)}},
+  async loadAdminStudents(){this.renderAdminLoading('admin-view-students');try{const b=await this.call('admin.batches',{},this.adminToken);this.adminData.batches=b.success?b.data||[]:[];const current=document.getElementById('studentBatchSelect')?.value||this.adminData.batches[0]?.id||'';const r=await this.call('admin.students',{batch_id:current},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.adminData.students=r.data||[];document.getElementById('admin-view-students').innerHTML=`<div class="admin-panel"><div class="admin-panel-head"><div><h2>Students</h2><p>Pilih batch untuk melihat siswa per batch.</p></div><select id="studentBatchSelect" class="input" onchange="App.loadAdminStudents()"><option value="">Pilih batch</option>${this.adminData.batches.map(x=>`<option value="${this.escapeAttr(x.id)}" ${x.id===current?'selected':''}>${this.escape(x.name)}</option>`).join('')}</select></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Status</th><th>Month</th><th>Meeting</th><th>Completion</th><th>Action</th></tr></thead><tbody>${this.adminData.students.map(x=>`<tr><td><strong>${this.escape(x.name)}</strong><div class="muted">${this.escape(x.student_id)} • ${this.escape(x.email)}</div></td><td><select class="input" onchange="App.changeStudentStatus('${this.escapeAttr(x.enrollment_id)}',this.value)"><option value="ACTIVE" ${x.status==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${x.status==='INACTIVE'?'selected':''}>INACTIVE</option><option value="COMPLETED" ${x.status==='COMPLETED'?'selected':''}>COMPLETED</option><option value="CANCELLED" ${x.status==='CANCELLED'?'selected':''}>CANCELLED</option></select></td><td>${x.month}${x.months_total?`<div class="muted">dari ${x.months_total} bulan</div>`:''}</td><td>${x.meeting}${x.meetings_total?`/${x.meetings_total}`:''}<div class="muted">pertemuan</div></td><td><span class="tag ${x.completion_status==='COMPLETED'?'success':''}">${this.escape(x.completion_status)}</span>${x.months_total?`<div class="muted">${x.months_completed||0}/${x.months_total} bulan selesai</div>`:''}</td><td><button class="btn btn-light" onclick="App.openStudentDetail('${this.escapeAttr(x.student_id)}')">Detail</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="admin-empty">Tidak ada siswa dalam batch ini.</div></td></tr>'}</tbody></table></div></div>`}catch(e){this.showAdminError('admin-view-students',e)}},
   async changeStudentStatus(enrollmentId,status){try{const r=await this.call('admin.student.status',{enrollment_id:enrollmentId,status},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Status enrollment diperbarui.','success');await this.loadAdminStudents()}catch(e){this.toast(e.message,'error')}},
   async openStudentDetail(id){try{const [s,a]=await Promise.all([this.call('admin.student.detail',{student_id:id},this.adminToken),this.call('admin.achievements',{},this.adminToken)]);if(!s.success)throw new Error(this.friendlyError(s));const d=s.data||{},achs=a.success?a.data||[]:[];this.modalTitle('Student Detail');this.modalBody(`<div class="profile-layout"><div class="profile-box"><h2 style="margin-top:0">${this.escape(d.student.name)}</h2><div class="muted">${this.escape(d.student.email)}</div><div class="profile-fields"><div class="field"><small>Student ID</small><strong>${this.escape(d.student.id)}</strong></div><div class="field"><small>WhatsApp</small><strong>${this.escape(d.student.phone||'-')}</strong></div><div class="field"><small>Account</small><strong>${this.escape(d.student.status)}</strong></div></div></div><div class="profile-box"><h3>Achievements</h3><div class="field" style="margin-top:10px"><select id="achievementSelect" class="input"><option value="">Select achievement</option>${achs.map(x=>`<option value="${this.escapeAttr(x.id)}">${this.escape(x.name)}</option>`).join('')}</select><button class="btn btn-soft" style="margin-top:10px" onclick="App.awardAchievementTo('${this.escapeAttr((d.enrollments?.[0]?.id)||'')}')">Award achievement</button></div><div class="profile-fields">${(d.enrollments||[]).map(e=>`<div class="field"><small>Enrollment</small><strong>${this.escape(e.batch_name||'-')}</strong><div class="muted">${this.escape(e.program_name||'-')} • ${this.escape(e.status)} • Month ${e.current_month} • Meeting ${e.current_meeting}</div></div>`).join('')}</div></div></div>`);this._detailEnrollment=d.enrollments?.[0]?.id||'';this.openModal()}catch(e){this.toast(e.message,'error')}},
   async awardAchievementTo(enrollmentId){const id=document.getElementById('achievementSelect')?.value||this._detailEnrollment;if(!id||!document.getElementById('achievementSelect')?.value)return this.toast('Pilih achievement.','error');try{const r=await this.call('admin.achievement.award',{enrollment_id:enrollmentId,achievement_id:document.getElementById('achievementSelect').value},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Achievement awarded.','success');this.closeModal()}catch(e){this.toast(e.message,'error')}},
@@ -3272,7 +3299,7 @@ App.openBatchForm = function(row=null){
 /* ========================= COGNIORA V35 PATCH ========================= */
 (function(){
   // >>> GANTI dengan URL video YouTube "How to login" Anda (atau isi Setting HOW_TO_LOGIN_URL di Data_Settings).
-  const HOW_TO_LOGIN_URL='https://youtu.be/S90Zj3-TOg8';
+  const HOW_TO_LOGIN_URL='https://www.youtube.com/watch?v=S90Zj3-TOg8';
 
   /* ---------- utilities ---------- */
   const esc=s=>App.escape(s==null?'':String(s));
@@ -3497,7 +3524,7 @@ App.openBatchForm = function(row=null){
           if(!r.success)throw new Error(this.friendlyError(r));
           this.invalidateCache('admin.invoices');this.clearPanelReady();
           const errN=r.data?.error_count||0;
-          this.toast(`${r.data?.created_count||0} invoice dibuat; ${r.data?.skipped_count||0} dilewati${errN?`; ${errN} gagal`:''}.`,errN?'error':'success');
+          const mailFail=r.data?.email_failed_count||0;this.toast(`${r.data?.created_count||0} invoice dibuat, ${r.data?.email_sent_count||0} email terkirim${mailFail?` (${mailFail} email gagal)`:''}; ${r.data?.skipped_count||0} dilewati${errN?`; ${errN} gagal`:''}.`,(errN||mailFail)?'error':'success');
           await this.loadAdminInvoices();
         }catch(err){this.toast(err.message||'Invoice generation failed.','error');if(b){b.disabled=false;b.textContent='Generate Invoices';}}
       });
@@ -3724,6 +3751,104 @@ App.openBatchForm = function(row=null){
       const hm=pc.querySelector('.progress-head .muted'); if(hm) hm.textContent='Pertemuan terisi kehadirannya dan nilai bulanan mencapai minimum';
       const last=Array.from(pc.children).filter(x=>x.classList.contains('muted')).pop(); if(last) last.textContent=`${p.completed} of ${p.total} months completed.`;
     }
+  };
+})();
+
+
+/* ===== V38b: View Certificate langsung ke Google Drive ===== */
+(function(){
+  App.viewAdminCertificate=function(id){
+    const row=(this.adminData?.certificates||[]).find(x=>String(x.id)===String(id));
+    const url=row&&(row.file_url||(row.file_id?`https://drive.google.com/file/d/${row.file_id}/view`:''));
+    if(!url){this.toast('File certificate belum tersedia di Drive.','error');return;}
+    window.open(url,'_blank','noopener,noreferrer');
+  };
+})();
+
+
+/* ========================= COGNIORA V40 PATCH ========================= */
+(function(){
+  const esc=s=>App.escape(s==null?'':String(s));
+  const meetHref=u=>{const s=String(u||'').trim();if(!s)return'';if(/^https?:\/\//i.test(s))return s;if(/^\/\//.test(s))return'https:'+s;if(/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(s))return'https://meet.google.com/'+s.toLowerCase();return'https://'+s.replace(/^\/+/,'')};
+  const isOpen=x=>['ACTIVE','PLANNED'].includes(String(x.status||''))&&!x.done;
+
+  /* ---- Schedule student: EXPIRED/selesai = history (tanpa tombol Join) ---- */
+  App.scheduleCard=function(x){
+    const href=meetHref(x.meet_url),open=isOpen(x),canJoin=open&&x.type==='GOOGLE_MEET'&&href;
+    return `<div class="class-item ${open?'':'is-history'}"><div class="item-row"><div><div class="item-title">${esc(x.title||'Class')}</div><div class="muted">${esc(x.type==='GOOGLE_MEET'?'Google Meet':'Learning Source')} • Month ${esc(x.month)} • Meeting ${esc(x.meeting)}</div><div class="item-meta"><span class="tag">${esc(x.date||'')}</span><span class="tag">${esc(x.start||'')}</span><span class="tag ${open?'':'muted-tag'}">${esc(x.done&&x.status!=='EXPIRED'?'COMPLETED':x.status)}</span></div></div>${canJoin?`<a class="btn btn-primary" href="${App.escapeAttr(href)}" target="_blank" rel="noopener noreferrer"><i class="bi bi-camera-video"></i> Join</a>`:''}</div></div>`;
+  };
+  App.loadSchedule=async function(){
+    this.renderLoading('view-schedule');
+    try{
+      const r=await this.call('student.schedule',{},this.token,{bypassCache:true});
+      if(!r.success)throw new Error(this.friendlyError(r));
+      const all=r.data||[];this.data.schedule=all;
+      const key=x=>`${x.date||''} ${x.start||''}`;
+      const upcoming=all.filter(isOpen).sort((a,b)=>key(a).localeCompare(key(b)));
+      const history=all.filter(x=>!isOpen(x)).sort((a,b)=>key(b).localeCompare(key(a)));
+      document.getElementById('view-schedule').innerHTML=`<div class="page-head"><div><h1>Schedule</h1><p>Sesi yang akan datang dan riwayat sesi untuk enrollment Anda.</p></div></div>
+        <div class="section-title"><h2>Upcoming</h2></div><div class="class-list">${upcoming.map(x=>this.scheduleCard(x)).join('')||'<div class="empty">No upcoming schedule.</div>'}</div>
+        <div class="section-title" style="margin-top:22px"><h2>History</h2></div><div class="class-list">${history.map(x=>this.scheduleCard(x)).join('')||'<div class="empty">No history yet.</div>'}</div>`;
+    }catch(e){this.renderStudentError('view-schedule',e)}
+  };
+
+  /* ---- Modules: View => buka file di Google Drive ---- */
+  App.openMaterial=async function(id){
+    const m=(this.data.materials||[]).find(x=>String(x.id)===String(id)); if(!m) return;
+    if(m.locked) return this.toast(m.lock_reason||'This material is locked.','error');
+    const ext=String(m.external_url||'').trim();
+    if(!m.drive_file_id){
+      if(ext) window.open(ext,'_blank','noopener,noreferrer'); else this.toast('File belum tersedia untuk materi ini.','error');
+      return;
+    }
+    // Tab dibuka sinkron (anti popup-blocker), lalu diarahkan ke Drive setelah akses diverifikasi server.
+    const w=window.open('about:blank','_blank');
+    try{
+      const r=await this.call('student.file.link',{file_id:m.drive_file_id,material_id:m.id},this.token,{bypassCache:true});
+      if(!r.success) throw new Error(this.friendlyError(r));
+      const url=r.data&&r.data.url; if(!url) throw new Error('Link file tidak tersedia.');
+      if(w){w.opener=null;w.location.href=url;}
+      else{this.modalTitle(m.title||'Material');this.modalBody(`<p class="muted">Pop-up diblokir browser. Buka file lewat tombol berikut.</p><a class="btn btn-primary" href="${this.escapeAttr(url)}" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right"></i> Open in Drive</a>`);this.openModal();}
+    }catch(e){ if(w) try{w.close()}catch(_){} this.toast(e.message||'Unable to open material.','error'); }
+  };
+})();
+
+
+/* ========================= COGNIORA V41 PATCH ========================= */
+(function(){
+  /* Learning Sources: dropdown Month, hanya materi bulan terpilih yang tampil */
+  App.applyLearningMonthFilter=function(mode){
+    const root=document.getElementById('view-classroom'); if(!root) return;
+    const isVideo=(mode||sessionStorage.getItem('cogniora_learning_mode'))==='videos';
+    const list=(this.data?.materials||[]).filter(x=>!x.locked&&(isVideo?x.type==='VIDEO':x.type!=='VIDEO'));
+    const cards=Array.from(root.querySelectorAll('.source-grid .source-card'));
+    if(!cards.length||cards.length!==list.length) return;
+    const months=[...new Set(list.map(x=>Number(x.month||1)))].sort((a,b)=>a-b);
+    const cur=Number(this.dashboard?.enrollment?.current_month||1);
+    const saved=Number(sessionStorage.getItem('cogniora_learning_month')||0);
+    const pick=months.includes(saved)?saved:(months.includes(cur)?cur:(months.filter(m=>m<=cur).pop()||months[0]));
+    let sel=root.querySelector('#learningMonthSelect');
+    const head=root.querySelector('.source-subhead');
+    if(!sel&&head){
+      sel=document.createElement('select');sel.id='learningMonthSelect';sel.className='input learning-month-select';sel.setAttribute('aria-label','Month');
+      head.querySelector('.muted')?.remove();
+      const count=document.createElement('span');count.className='muted';count.id='learningMonthCount';
+      head.appendChild(sel);head.appendChild(count);
+    }
+    if(!sel) return;
+    sel.innerHTML=months.map(m=>`<option value="${m}" ${m===pick?'selected':''}>Month ${m}</option>`).join('');
+    const apply=()=>{
+      const m=Number(sel.value);sessionStorage.setItem('cogniora_learning_month',String(m));
+      let n=0;cards.forEach((c,i)=>{const show=Number(list[i].month||1)===m;c.style.display=show?'':'none';if(show)n++;});
+      const ct=root.querySelector('#learningMonthCount');if(ct)ct.textContent=`${n} item(s)`;
+    };
+    sel.onchange=apply;apply();
+  };
+  const _lcMonth=App.loadClassroom;
+  App.loadClassroom=async function(mode){
+    const r=await _lcMonth.apply(this,arguments);
+    try{this.applyLearningMonthFilter(mode)}catch(e){}
+    return r;
   };
 })();
 

@@ -1,11 +1,11 @@
 // COGNIORA — Vercel serverless proxy ke Google Apps Script (GAS)
 // Browser -> /api (same-origin, tanpa CORS) -> GAS_URL (+ api_key rahasia) -> Google Sheets/Drive.
 // Environment Variables (Vercel > Project > Settings > Environment Variables):
-//   GAS_URL      = URL Web App GAS berakhiran /exec
-//   GAS_API_KEY  = nilai Script Property "GAS_API_KEY" di Apps Script
+//   GAS_URL      = https://script.google.com/macros/s/AKfycbzPGt9a9KbGIaxtgrLkLkr46sZfw9ecxRbsY4RmYg1V-6cs5IXS1gcNdOFtgBkjoW1-/exec
+//   GAS_API_KEY  = 59872f7af981e58de0ec1165fdd18817bd73928ef683f26b
 
-const GAS_URL = process.env.GAS_URL || 'https://script.google.com/macros/s/AKfycbzPGt9a9KbGIaxtgrLkLkr46sZfw9ecxRbsY4RmYg1V-6cs5IXS1gcNdOFtgBkjoW1-/exec';
-const GAS_API_KEY = process.env.GAS_API_KEY || '59872f7af981e58de0ec1165fdd18817bd73928ef683f26b';
+const GAS_URL = process.env.GAS_URL || '';
+const GAS_API_KEY = process.env.GAS_API_KEY || '';
 const TIMEOUT_MS = 55000;
 const ALLOWED_PREFIX = /^(public|auth|student|admin)\.|^form:/;
 const ACTION_RE = /^(form:)?[A-Za-z]+(\.[A-Za-z0-9]+)+$/;
