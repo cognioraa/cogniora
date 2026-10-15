@@ -1743,6 +1743,11 @@ html,body{overflow-x:hidden}
 .btn-spinner{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:cgn-spin .7s linear infinite;vertical-align:-2px}
 @keyframes cgn-spin{to{transform:rotate(360deg)}}
 tr.row-processing{background:#fff8e6!important;outline:2px solid #f3d27a;outline-offset:-2px}
+
+/* V43: toolbar panel Students */
+.students-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.students-actions #studentBatchSelect{width:220px;flex:0 0 auto}
+@media (max-width:767px){.students-actions #studentBatchSelect{flex:1 1 100%}.students-actions .btn{flex:1 1 auto}}
 </style>
 
 </head>
@@ -3987,6 +3992,76 @@ App.openBatchForm = function(row=null){
     try{const r=await this.call('admin.payment.reject',{payment_id:id,reason},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Payment rejected.','success');await this.loadAdminPayments();}
     catch(e){this.toast(e.message,'error');clearBusy(id);}
     finally{delete busy['pay:'+id];}
+  };
+})();
+
+
+/* ========================= COGNIORA V43 PATCH ========================= */
+(function(){
+  const esc=s=>App.escape(s==null?'':String(s));
+  const attr=s=>App.escapeAttr(s==null?'':String(s));
+  // State tampilan panel Students (tetap ada walau panel dirender ulang)
+  const view={shown:false,batchId:'',loading:false};
+  const ALL='__ALL__';
+
+  const rowHtml=x=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.student_id)} • ${esc(x.email)}</div></td><td><select class="input" onchange="App.changeStudentStatus('${attr(x.enrollment_id)}',this.value)">${['ACTIVE','INACTIVE','COMPLETED','CANCELLED'].map(s=>`<option value="${s}" ${x.status===s?'selected':''}>${s}</option>`).join('')}</select></td><td>${x.month}${x.months_total?`<div class="muted">dari ${x.months_total} bulan</div>`:''}</td><td>${x.meeting}${x.meetings_total?`/${x.meetings_total}`:''}<div class="muted">pertemuan</div></td><td><span class="tag ${x.completion_status==='COMPLETED'?'success':''}">${esc(x.completion_status)}</span>${x.months_total?`<div class="muted">${x.months_completed||0}/${x.months_total} bulan selesai</div>`:''}</td><td><button class="btn btn-light" onclick="App.openStudentDetail('${attr(x.student_id)}')">Detail</button></td></tr>`;
+
+  const batchName=id=>id===ALL?'Semua batch':((App.adminData.batches||[]).find(b=>String(b.id)===String(id))||{}).name||'';
+
+  App.loadAdminStudents=async function(){
+    const root=document.getElementById('admin-view-students'); if(!root) return;
+    this.renderAdminLoading('admin-view-students');
+    try{
+      const b=await this.call('admin.batches',{},this.adminToken);
+      this.adminData.batches=b.success?b.data||[]:[];
+      const opts=this.adminData.batches.map(x=>`<option value="${attr(x.id)}" ${x.id===view.batchId?'selected':''}>${esc(x.name)}</option>`).join('');
+      root.innerHTML=`<div class="admin-panel"><div class="admin-panel-head"><div><h2>Students</h2><p>Pilih batch, lalu klik Tampilkan Siswa.</p></div><div class="admin-actions students-actions"><select id="studentBatchSelect" class="input" style="min-width:180px"><option value="">Pilih batch</option><option value="${ALL}" ${view.batchId===ALL?'selected':''}>Semua batch</option>${opts}</select><button type="button" class="btn btn-primary" id="showStudentsBtn">Tampilkan Siswa</button><button type="button" class="btn btn-light" id="refreshStudentsBtn" title="Muat ulang batch yang sedang ditampilkan"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div></div><div class="muted" id="studentsInfo" style="padding:0 18px 10px"></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Status</th><th>Month</th><th>Meeting</th><th>Completion</th><th>Action</th></tr></thead><tbody id="studentRows"><tr><td colspan="6"><div class="admin-empty">Pilih batch lalu klik "Tampilkan Siswa".</div></td></tr></tbody></table></div></div>`;
+      document.getElementById('showStudentsBtn').onclick=()=>{const v=document.getElementById('studentBatchSelect').value;if(!v){this.toast('Pilih batch terlebih dahulu.','error');return;}view.batchId=v;view.shown=true;this.showAdminStudents(false);};
+      document.getElementById('refreshStudentsBtn').onclick=()=>this.refreshAdminStudents();
+      if(view.shown&&view.batchId) await this.showAdminStudents(false,true);
+    }catch(e){this.showAdminError('admin-view-students',e)}
+  };
+
+  // Memuat siswa untuk batch aktif saja (tanpa merender ulang panel / mereset dropdown).
+  App.showAdminStudents=async function(forceFresh,silent){
+    if(view.loading) return; if(!view.shown||!view.batchId) return;
+    const body=document.getElementById('studentRows'),info=document.getElementById('studentsInfo'),show=document.getElementById('showStudentsBtn'),ref=document.getElementById('refreshStudentsBtn');
+    if(!body) return;
+    view.loading=true;
+    const refLabel=ref?ref.innerHTML:'',showLabel=show?show.innerHTML:'';
+    if(show){show.disabled=true;if(!forceFresh)show.textContent='Memuat...';}
+    if(ref){ref.disabled=true;if(forceFresh)ref.innerHTML='<span class="btn-spinner"></span> Memuat...';}
+    body.innerHTML='<tr><td colspan="6"><div class="admin-empty">Memuat siswa...</div></td></tr>';
+    try{
+      const r=await this.call('admin.students',{batch_id:view.batchId===ALL?'':view.batchId},this.adminToken,{bypassCache:true});
+      if(!r.success)throw new Error(this.friendlyError(r));
+      this.adminData.students=r.data||[];
+      body.innerHTML=this.adminData.students.map(rowHtml).join('')||'<tr><td colspan="6"><div class="admin-empty">Tidak ada siswa dalam batch ini.</div></td></tr>';
+      if(info)info.textContent=`${batchName(view.batchId)} • ${this.adminData.students.length} siswa`;
+    }catch(e){
+      body.innerHTML=`<tr><td colspan="6"><div class="admin-empty">${esc(e.message||'Gagal memuat siswa.')}</div></td></tr>`;
+    }finally{
+      view.loading=false;
+      if(show){show.disabled=false;show.innerHTML=showLabel;}
+      if(ref){ref.disabled=false;ref.innerHTML=refLabel;}
+    }
+  };
+
+  // Refresh = muat ulang BATCH YANG SEDANG DITAMPILKAN (bukan halaman, bukan batch pertama).
+  App.refreshAdminStudents=async function(){
+    this.invalidateCache('admin.students');
+    if(!view.shown||!view.batchId){this.toast('Pilih batch dan klik Tampilkan Siswa terlebih dahulu.','error');return;}
+    await this.showAdminStudents(true);
+  };
+
+  // Setelah ubah status siswa: muat ulang batch yang sama saja.
+  App.changeStudentStatus=async function(enrollmentId,status){
+    try{
+      const r=await this.call('admin.student.status',{enrollment_id:enrollmentId,status},this.adminToken);
+      if(!r.success)throw new Error(this.friendlyError(r));
+      this.toast('Status enrollment diperbarui.','success');
+      await this.showAdminStudents(true);
+    }catch(e){this.toast(e.message,'error');await this.showAdminStudents(true);}
   };
 })();
 
