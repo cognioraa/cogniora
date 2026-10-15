@@ -1737,6 +1737,12 @@ html,body{overflow-x:hidden}
 /* V41: dropdown Month di Learning Sources */
 .source-subhead{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .learning-month-select{width:auto;min-width:130px;padding:8px 34px 8px 12px;font-weight:700}
+
+/* V42: indikator proses */
+.btn.is-busy{opacity:.85;cursor:progress}
+.btn-spinner{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:cgn-spin .7s linear infinite;vertical-align:-2px}
+@keyframes cgn-spin{to{transform:rotate(360deg)}}
+tr.row-processing{background:#fff8e6!important;outline:2px solid #f3d27a;outline-offset:-2px}
 </style>
 
 </head>
@@ -2169,8 +2175,8 @@ const App = {
     // Add separate Problem and Solution sections while preserving the user's visual system.
     if(!document.getElementById('problem')){
       const about=document.getElementById('about');
-      const problem=document.createElement('section');problem.id='problem';problem.className='section alt';problem.innerHTML=`<div class="container"><div class="section-head"><span class="eyebrow">Masalah</span><h2>Kamu bisa memahami orang lain berbicara bahasa Inggris, tapi tidak tahu harus menjawab apa?</h2><p>Banyak siswa memahami kata dan kalimat yang mereka dengar, tetapi kesulitan mengubah pemahaman itu menjadi respons yang cepat dan natural.</p></div><div class="feature-grid"><div class="card"><div class="feature-icon"><i class="bi bi-ear"></i></div><h3>Memahami tetapi pasif</h3><p>Kamu menangkap maksud percakapan, tetapi masih ragu saat harus menjawab.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-shield-exclamation"></i></div><h3>Terlalu takut salah</h3><p>Fokus berlebihan pada kesalahan membuat respons menjadi lambat.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-arrow-repeat"></i></div><h3>Kurang latihan kontekstual</h3><p>Materi sudah dipelajari, tetapi belum cukup sering digunakan dalam situasi nyata.</p></div></div></div>`;
-      const solution=document.createElement('section');solution.id='solution';solution.className='section';solution.innerHTML=`<div class="container"><div class="section-head"><span class="eyebrow">Solusi</span><h2>Cogniora membantu kamu berpindah dari memahami menjadi mampu menggunakan.</h2><p>Pembelajaran dirancang melalui materi terstruktur, latihan interaktif, penerapan dalam konteks nyata, dan progress tracking.</p></div><div class="feature-grid"><div class="card"><div class="feature-icon"><i class="bi bi-journal-check"></i></div><h3>Belajar terarah</h3><p>Setiap materi memiliki urutan dan tujuan pembelajaran yang jelas.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-chat-square-text"></i></div><h3>Latihan nyata</h3><p>Roleplay, conversation, simulation, dan task membuat bahasa Inggris langsung digunakan.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div><h3>Terlihat progresnya</h3><p>Material, assignment, attendance, nilai, feedback, dan achievement terdokumentasi.</p></div></div></div>`;
+      const problem=document.createElement('section');problem.id='problem';problem.className='section alt';problem.innerHTML=`<div class="container"><div class="section-head"><span class="eyebrow">Pernah ngalamin nggak?</span><h2>Kamu bisa memahami orang lain berbicara bahasa Inggris, tapi tidak tahu harus menjawab apa?</h2><p>Banyak siswa memahami kata dan kalimat yang mereka dengar, tetapi kesulitan mengubah pemahaman itu menjadi respons yang cepat dan natural.</p></div><div class="feature-grid"><div class="card"><div class="feature-icon"><i class="bi bi-ear"></i></div><h3>Memahami tetapi pasif</h3><p>Kamu menangkap maksud percakapan, tetapi masih ragu saat harus menjawab.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-shield-exclamation"></i></div><h3>Terlalu takut salah</h3><p>Fokus berlebihan pada kesalahan membuat respons menjadi lambat.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-arrow-repeat"></i></div><h3>Kurang latihan kontekstual</h3><p>Materi sudah dipelajari, tetapi belum cukup sering digunakan dalam situasi nyata.</p></div></div></div>`;
+      const solution=document.createElement('section');solution.id='solution';solution.className='section';solution.innerHTML=`<div class="container"><div class="section-head"><span class="eyebrow">Ini untuk kamu</span><h2>Cogniora membantu kamu berpindah dari memahami menjadi mampu menggunakan.</h2><p>Pembelajaran dirancang melalui materi terstruktur, latihan interaktif, penerapan dalam konteks nyata, dan progress tracking.</p></div><div class="feature-grid"><div class="card"><div class="feature-icon"><i class="bi bi-journal-check"></i></div><h3>Belajar terarah</h3><p>Setiap materi memiliki urutan dan tujuan pembelajaran yang jelas.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-chat-square-text"></i></div><h3>Latihan nyata</h3><p>Roleplay, conversation, simulation, dan task membuat bahasa Inggris langsung digunakan.</p></div><div class="card"><div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div><h3>Terlihat progresnya</h3><p>Material, assignment, attendance, nilai, feedback, dan achievement terdokumentasi.</p></div></div></div>`;
       if(about){about.before(problem);about.after(solution)}
     }
     // Admin navigation additions required by blueprint.
@@ -2366,7 +2372,7 @@ const App = {
   async openStudentCertificateFile(certificateId){try{const r=await this.call('student.certificate.file',{certificate_id:certificateId},this.token);if(!r.success)throw new Error(this.friendlyError(r));this.openDataUrlInNewTab(r.data.data_url,r.data.name||'certificate.pdf')}catch(e){this.toast(e.message||'Certificate file unavailable.','error')}},
   openDataUrlInNewTab(dataUrl,fileName){try{const parts=String(dataUrl||'').split(',');const meta=parts[0]||'';const raw=parts.slice(1).join(',');const mime=(meta.match(/^data:([^;]+)/)||[])[1]||'application/octet-stream';const bin=atob(raw);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const url=URL.createObjectURL(new Blob([bytes],{type:mime}));const w=window.open(url,'_blank','noopener');if(!w){const a=document.createElement('a');a.href=url;a.download=fileName||'download';document.body.appendChild(a);a.click();a.remove()}setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){this.toast('Unable to open file.','error')}},
 
-  async loadProfile(){this.renderLoading('view-profile');try{const r=await this.call('student.profile',{},this.token);if(!r.success)throw new Error(this.friendlyError(r));const s=r.data||{},e=s.enrollment||{};document.getElementById('view-profile').innerHTML=`<div class="page-head"><div><h1>Profile</h1><p>Your account and enrollment information.</p></div></div><div class="profile-layout"><div class="profile-box"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px">${s.photo_url?`<img class="profile-photo" src="${this.escape(s.photo_url)}" alt="">`:`<div class="profile-photo">${this.escape(this.initials(s.name))}</div>`}<form id="profilePhotoForm"><input type="hidden" name="token" value="${this.escapeAttr(this.token)}"><input id="profileFile" name="file" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="2097152" hidden><button type="button" class="btn btn-soft" onclick="document.getElementById('profileFile').click()"><i class="bi bi-camera"></i> Change photo</button><div class="muted">JPG, PNG or WebP • max 2 MB</div></form><h2 style="margin:6px 0 0">${this.escape(s.name)}</h2><div class="muted">${this.escape(s.email)}</div></div></div><div class="profile-box"><div class="profile-fields"><div class="field"><small>Student ID</small><strong>${this.escape(s.id)}</strong></div><div class="field"><small>Full Name</small><strong>${this.escape(s.name)}</strong></div><div class="field"><small>Email</small><strong>${this.escape(s.email)}</strong></div><div class="field"><small>WhatsApp Number</small><strong>${this.escape(s.phone||'-')}</strong></div><div class="field"><small>Batch</small><strong>${this.escape(e.batch_name||'-')}</strong></div><div class="field"><small>Program</small><strong>${this.escape(e.program_name||'-')}</strong></div><div class="field"><small>Level</small><strong>${this.escape(s.level||'-')}</strong></div><div class="field"><small>Meetings Completed</small><strong>${this.escape(String(e.current_meeting??0))}</strong></div><div class="field"><small>Current Month</small><strong>${this.escape(String(e.current_month??0))}</strong></div><div class="field"><small>Enrollment Status</small><strong>${this.escape(e.status||'-')}</strong></div><div class="field"><small>Graduation Status</small><strong>${this.escape(e.completion_status||'-')}</strong></div></div></div></div>`;document.getElementById('profileFile')?.addEventListener('change',async()=>{try{const r=await this.callForm('student.profile.photo',document.getElementById('profilePhotoForm'));if(!r.success)throw new Error(this.friendlyError(r));this.currentStudent.photo_url=r.data.photo_url;this.toast('Profile photo updated.','success');await this.loadProfile();this.updateMiniHeader()}catch(err){this.toast(err.message,'error')}})}catch(e){this.renderStudentError('view-profile',e)}},
+  async loadProfile(){this.renderLoading('view-profile');try{const r=await this.call('student.profile',{},this.token);if(!r.success)throw new Error(this.friendlyError(r));const s=r.data||{},e=s.enrollment||{};document.getElementById('view-profile').innerHTML=`<div class="page-head"><div><h1>Profile</h1><p>Your account and enrollment information.</p></div></div><div class="profile-layout"><div class="profile-box"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px">${s.photo_url?`<img class="profile-photo" src="${this.escape(s.photo_url)}" alt="">`:`<div class="profile-photo">${this.escape(this.initials(s.name))}</div>`}<form id="profilePhotoForm"><input type="hidden" name="token" value="${this.escapeAttr(this.token)}"><input id="profileFile" name="file" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="2097152" hidden><button type="button" class="btn btn-soft" onclick="document.getElementById('profileFile').click()"><i class="bi bi-camera"></i> Change photo</button><div class="muted">JPG, PNG or WebP • max 2 MB</div></form><h2 style="margin:6px 0 0">${this.escape(s.name)}</h2><div class="muted">${this.escape(s.email)}</div></div></div><div class="profile-box"><div class="profile-fields"><div class="field"><small>Student ID</small><strong>${this.escape(s.id)}</strong></div><div class="field"><small>Full Name</small><strong>${this.escape(s.name)}</strong></div><div class="field"><small>Email</small><strong>${this.escape(s.email)}</strong></div><div class="field"><small>WhatsApp Number</small><strong>${this.escape(s.phone||'-')}</strong></div><div class="field"><small>Batch</small><strong>${this.escape(e.batch_name||'-')}</strong></div><div class="field"><small>Program</small><strong>${this.escape(e.program_name||'-')}</strong></div><div class="field"><small>Level</small><strong>${this.escape(s.level||'-')}</strong></div><div class="field"><small>Meetings Completed</small><strong>${this.escape(String(e.current_meeting??0))}${e.meetings_total?'/'+e.meetings_total:''}</strong></div><div class="field"><small>Current Month</small><strong>${this.escape(String(e.current_month??0))}${e.months_total?'/'+e.months_total:''}</strong></div><div class="field"><small>Enrollment Status</small><strong>${this.escape(e.status||'-')}</strong></div><div class="field"><small>Graduation Status</small><strong>${this.escape(e.completion_status||'-')}</strong>${e.months_total?`<div class="muted">${e.months_completed||0}/${e.months_total} bulan selesai</div>`:''}</div></div></div></div>`;document.getElementById('profileFile')?.addEventListener('change',async()=>{try{const r=await this.callForm('student.profile.photo',document.getElementById('profilePhotoForm'));if(!r.success)throw new Error(this.friendlyError(r));this.currentStudent.photo_url=r.data.photo_url;this.toast('Profile photo updated.','success');await this.loadProfile();this.updateMiniHeader()}catch(err){this.toast(err.message,'error')}})}catch(e){this.renderStudentError('view-profile',e)}},
 
   /* ---------------- Admin/Tutor ---------------- */
   async openAdminRoute(name='overview'){
@@ -3299,7 +3305,7 @@ App.openBatchForm = function(row=null){
 /* ========================= COGNIORA V35 PATCH ========================= */
 (function(){
   // >>> GANTI dengan URL video YouTube "How to login" Anda (atau isi Setting HOW_TO_LOGIN_URL di Data_Settings).
-  const HOW_TO_LOGIN_URL='https://www.youtube.com/watch?v=S90Zj3-TOg8';
+  const HOW_TO_LOGIN_URL='youtu.be/S90Zj3-TOg8';
 
   /* ---------- utilities ---------- */
   const esc=s=>App.escape(s==null?'':String(s));
@@ -3849,6 +3855,138 @@ App.openBatchForm = function(row=null){
     const r=await _lcMonth.apply(this,arguments);
     try{this.applyLearningMonthFilter(mode)}catch(e){}
     return r;
+  };
+})();
+
+
+/* ========================= COGNIORA V42 PATCH ========================= */
+(function(){
+  const esc=s=>App.escape(s==null?'':String(s));
+  const attr=s=>App.escapeAttr(s==null?'':String(s));
+
+  /* ---- 1. Mutasi admin/student selalu membersihkan cache + cache panel (convert lead, status siswa, generate invoice) ---- */
+  Object.assign(App._mutationActions=App._mutationActions||{},{'admin.leads.convert':true,'admin.student.status':true,'admin.invoice.generate':true,'admin.certificate.eligibility':true});
+  const _call=App.call;
+  App.call=async function(action){
+    const r=await _call.apply(this,arguments);
+    try{ if(App._mutationActions[action] && !(r&&r.success===false)){ App.invalidateCache(); App.clearPanelReady(); } }catch(e){}
+    return r;
+  };
+
+  /* ---- 2. Input login: matikan autocapitalize/autocorrect (terutama saat tombol "tampilkan password" mengubah type jadi text) ---- */
+  const harden=root=>{
+    (root.querySelectorAll?root.querySelectorAll('input[type="password"],input[name="password"],input[name="new_password"],input[name="current_password"],input[type="email"],input[name="email"]'):[]).forEach(i=>{
+      i.setAttribute('autocapitalize','off');i.setAttribute('autocorrect','off');i.setAttribute('spellcheck','false');
+    });
+  };
+  harden(document);
+  new MutationObserver(m=>m.forEach(x=>x.addedNodes.forEach(n=>{if(n.nodeType===1)harden(n)}))).observe(document.documentElement,{childList:true,subtree:true});
+
+  /* ---- 3. URL "How to login?" harus absolut (tanpa https:// dianggap relatif) ---- */
+  const _how=App.howToLoginUrl;
+  App.howToLoginUrl=function(){let u=String(_how.apply(this,arguments)||'').trim();if(u&&!/^https?:\/\//i.test(u))u='https://'+u.replace(/^\/+/,'');return u;};
+  try{App.ensureLoginHelp()}catch(e){}
+
+  /* ---- 4. Download: satu klik = satu unduhan ---- */
+  const busy={};
+  const once=async(key,fn)=>{if(busy[key])return;busy[key]=true;try{return await fn()}finally{setTimeout(()=>{delete busy[key]},800)}};
+  App.saveDataUrl=function(dataUrl,fileName){
+    const parts=String(dataUrl||'').split(','),mime=(parts[0].match(/^data:([^;]+)/)||[])[1]||'application/octet-stream';
+    const bin=atob(parts.slice(1).join(',')),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:mime})),a=document.createElement('a');
+    a.href=url;a.download=fileName||'download';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  };
+  // Penyebab lama: window.open(...,'noopener') SELALU mengembalikan null, sehingga fallback unduhan ikut berjalan (tab baru + download).
+  App.openDataUrlInNewTab=function(dataUrl,fileName){
+    try{
+      const parts=String(dataUrl||'').split(','),mime=(parts[0].match(/^data:([^;]+)/)||[])[1]||'application/octet-stream';
+      const bin=atob(parts.slice(1).join(',')),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+      const url=URL.createObjectURL(new Blob([bytes],{type:mime}));
+      const w=window.open(url,'_blank');
+      if(!w){const a=document.createElement('a');a.href=url;a.download=fileName||'download';document.body.appendChild(a);a.click();a.remove();}
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){this.toast('Unable to open file.','error')}
+  };
+  App.downloadMaterial=function(id){
+    const m=(this.data.materials||[]).find(x=>String(x.id)===String(id)); if(!m||m.locked) return;
+    return once('mat:'+id,async()=>{
+      this.toast('Menyiapkan unduhan...','success');
+      try{const r=await this.call('student.file',{file_id:m.drive_file_id,material_id:m.id},this.token,{bypassCache:true});if(!r.success)throw new Error(this.friendlyError(r));this.saveDataUrl(r.data.data_url,r.data.name||m.title||'download');}
+      catch(e){this.toast(e.message||'Download failed.','error')}
+    });
+  };
+
+  /* ---- 5. Link Drive generik (tab dibuka sinkron agar tidak diblokir popup blocker) ---- */
+  App.openDriveLink=async function(action,payload,title){
+    const w=window.open('about:blank','_blank');
+    try{
+      const r=await this.call(action,payload,this.token,{bypassCache:true});
+      if(!r.success)throw new Error(this.friendlyError(r));
+      const url=r.data&&r.data.url;if(!url)throw new Error('Link file tidak tersedia.');
+      if(w){w.opener=null;w.location.href=url;}
+      else{this.modalTitle(title||'File');this.modalBody(`<p class="muted">Pop-up diblokir browser. Buka file lewat tombol berikut.</p><a class="btn btn-primary" href="${attr(url)}" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right"></i> Open in Drive</a>`);this.openModal();}
+    }catch(e){if(w)try{w.close()}catch(_){}this.toast(e.message||'Unable to open file.','error');}
+  };
+
+  /* ---- 6. Certificate student: View (Drive) + Download ---- */
+  App.loadCertificate=async function(){
+    this.renderLoading('view-certificate');
+    try{
+      const r=await this.call('student.certificate',{},this.token,{bypassCache:true});
+      if(!r.success)throw new Error(this.friendlyError(r));
+      const d=r.data||{},req=d.requirements||{},c=d.certificate;
+      document.getElementById('view-certificate').innerHTML=d.eligible&&c
+        ?`<div class="locked-panel"><div style="font-size:58px">🎓</div><h3>Congratulations!</h3><p>Your certificate has been issued.</p><div class="item-meta" style="justify-content:center"><span class="tag success">${esc(c.no)}</span><span class="tag">Version ${c.version}</span></div><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px"><button class="btn btn-soft" onclick="App.viewStudentCertificate()"><i class="bi bi-box-arrow-up-right"></i> View</button><button class="btn btn-primary" id="certDownloadBtn" onclick="App.downloadStudentCertificate('${attr(c.id||'')}')"><i class="bi bi-download"></i> Download</button></div></div>`
+        :`<div class="locked-panel"><i class="bi bi-lock-fill"></i><h3>Certificate unavailable</h3><p>${esc(req.reasons?.[0]||'Complete the program requirements to unlock your certificate.')}</p><div class="two-grid" style="margin-top:16px"><div class="field"><small>Completed Months</small><strong>${req.completed_months??0}/${req.total_months??0}</strong></div><div class="field"><small>Average Score</small><strong>${req.average??0}</strong></div><div class="field"><small>Attendance</small><strong>${req.attendance_percentage??0}%</strong></div></div></div>`;
+    }catch(e){this.renderStudentError('view-certificate',e)}
+  };
+  App.viewStudentCertificate=function(){return this.openDriveLink('student.certificate.link',{},'Certificate');};
+  App.downloadStudentCertificate=function(id){
+    return once('cert:'+id,async()=>{
+      const btn=document.getElementById('certDownloadBtn'),label=btn?btn.innerHTML:'';
+      if(btn){btn.disabled=true;btn.textContent='Downloading...';}
+      try{const r=await this.call('student.certificate.file',{certificate_id:id},this.token,{bypassCache:true});if(!r.success)throw new Error(this.friendlyError(r));this.saveDataUrl(r.data.data_url,r.data.name||'certificate.pdf');}
+      catch(e){this.toast(e.message||'Certificate file unavailable.','error')}
+      finally{if(btn){btn.disabled=false;btn.innerHTML=label;}}
+    });
+  };
+  App.openStudentCertificateFile=function(id){return this.downloadStudentCertificate(id);};
+
+  /* ---- 7. Assignment: View file yang sudah disubmit -> Drive ---- */
+  App.assignmentCard=function(x){
+    const cls=x.status==='ACCEPTED'?'success':x.status==='NEED_REVISION'?'danger':x.status==='SUBMITTED'?'warn':'';
+    const canSubmit=(x.status==='NOT_SUBMITTED'||x.status==='NEED_REVISION');
+    return `<div class="task-item"><div class="item-row"><div><div class="item-title">${esc(x.title)}</div><div class="muted">Month ${x.month} • ${x.deadline?'Due '+esc(x.deadline):'No deadline'}</div></div><div class="item-meta"><span class="tag ${cls}">${esc(String(x.status||'').replace(/_/g,' '))}</span>${x.has_file?`<button class="btn btn-light" onclick="App.viewAssignmentFile('${attr(x.id)}')"><i class="bi bi-box-arrow-up-right"></i> View</button>`:''}${canSubmit?`<button class="btn btn-soft" onclick="App.openAssignment('${attr(x.id)}')">${x.status==='NEED_REVISION'?'Resubmit':'Submit'}</button>`:''}</div></div>${x.feedback?`<div class="muted" style="margin-top:8px"><strong>Feedback:</strong> ${esc(x.feedback)}</div>`:''}</div>`;
+  };
+  App.viewAssignmentFile=function(id){return this.openDriveLink('student.assignment.link',{id},'Assignment');};
+
+  /* ---- 8. Payment admin: indikator "Approving..." / "Rejecting..." ---- */
+  const payButtons=id=>Array.from(document.querySelectorAll('#admin-view-payments button')).filter(b=>(b.getAttribute('onclick')||'').includes(`Payment('${id}')`));
+  const setBusy=(id,kind)=>{
+    payButtons(id).forEach(b=>{
+      const mine=(b.getAttribute('onclick')||'').includes(kind+'Payment');
+      b.disabled=true;
+      if(mine){b.dataset.label=b.innerHTML;b.classList.add('is-busy');b.innerHTML=`<span class="btn-spinner"></span> ${kind==='approve'?'Approving...':'Rejecting...'}`;}
+    });
+    const row=payButtons(id)[0]?.closest('tr');if(row)row.classList.add('row-processing');
+  };
+  const clearBusy=id=>{
+    payButtons(id).forEach(b=>{b.disabled=false;b.classList.remove('is-busy');if(b.dataset.label){b.innerHTML=b.dataset.label;delete b.dataset.label;}});
+    payButtons(id)[0]?.closest('tr')?.classList.remove('row-processing');
+  };
+  App.approvePayment=async function(id){
+    if(busy['pay:'+id])return;busy['pay:'+id]=true;setBusy(id,'approve');
+    try{const r=await this.call('admin.payment.approve',{payment_id:id},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Payment approved.','success');await this.loadAdminPayments();}
+    catch(e){this.toast(e.message,'error');clearBusy(id);}
+    finally{delete busy['pay:'+id];}
+  };
+  App.rejectPayment=async function(id){
+    if(busy['pay:'+id])return;
+    const reason=prompt('Alasan penolakan:','Bukti pembayaran tidak jelas.');if(reason===null)return;
+    busy['pay:'+id]=true;setBusy(id,'reject');
+    try{const r=await this.call('admin.payment.reject',{payment_id:id,reason},this.adminToken);if(!r.success)throw new Error(this.friendlyError(r));this.toast('Payment rejected.','success');await this.loadAdminPayments();}
+    catch(e){this.toast(e.message,'error');clearBusy(id);}
+    finally{delete busy['pay:'+id];}
   };
 })();
 
