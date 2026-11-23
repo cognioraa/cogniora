@@ -1,6 +1,14 @@
 {
-  "name": "cogniora-lms",
-  "version": "1.0.0",
+  "name": "cogniora-lms-v2",
+  "version": "2.0.0",
   "private": true,
-  "engines": { "node": "24.x" }
+  "description": "Cogniora English Learning & Business Management Platform",
+  "scripts": {
+    "build": "node scripts/sync-frontend.js",
+    "sync:frontend": "node scripts/sync-frontend.js",
+    "gas:push": "cd gas && clasp push",
+    "gas:push:force": "cd gas && clasp push --force",
+    "gas:open": "cd gas && clasp open-script",
+    "gas:deployments": "cd gas && clasp deployments"
+  }
 }

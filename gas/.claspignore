@@ -1,0 +1,5 @@
+**/*.md
+**/*.zip
+**/node_modules/**
+**/.clasp.json
+**/.claspignore

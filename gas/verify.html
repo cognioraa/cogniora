@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>COGNIORA — Certificate Verification</title>
+  <style>
+    body{margin:0;background:#f4f6fa;color:#1f2430;font-family:Inter,Arial,sans-serif;min-height:100vh;display:grid;place-items:center}
+    .card{width:min(620px,calc(100% - 32px));background:#fff;border:1px solid #e7eaf1;border-radius:22px;padding:28px;box-shadow:0 14px 40px rgba(38,43,76,.08)}
+    h1{margin:0 0 8px}.muted{color:#7b8190;line-height:1.6}.row{display:flex;gap:10px;margin-top:18px}.input{flex:1;border:1px solid #dfe3ed;border-radius:12px;padding:12px 14px;font:inherit}.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer;background:#5968f3;color:#fff}.result{margin-top:18px;padding:16px;border-radius:14px;background:#f8f9fc}.ok{border-left:4px solid #2bb673}.bad{border-left:4px solid #e95d6a}.result dl{display:grid;grid-template-columns:150px 1fr;gap:7px 12px;margin:12px 0 0}.result dt{color:#7b8190}.result dd{margin:0;font-weight:600}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>COGNIORA Certificate Verification</h1>
+    <p class="muted">Masukkan kode verifikasi pada certificate untuk memeriksa keaslian data penerbitan.</p>
+    <div class="row"><input id="code" class="input" placeholder="Verification Code"><button class="btn" onclick="verify()">Verify</button></div>
+    <div id="result" class="result" hidden></div>
+  </main>
+  <script>
+    function show(html,ok){const r=document.getElementById('result');r.hidden=false;r.className='result '+(ok?'ok':'bad');r.innerHTML=html}
+    function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+    async function verify(){
+      const code=document.getElementById('code').value.trim();
+      if(!code)return show('Masukkan verification code.',false);
+      show('Memeriksa...',true);
+      try{
+        let r;
+        if(window.google&&google.script&&google.script.run){
+          r=await new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).apiInvoke('public.certificate.verify',{verification_code:code},''));
+        }else{
+          const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'public.certificate.verify',data:{verification_code:code},session_token:''})});
+          r=await response.json();
+        }
+        if(!r||!r.success)return show(esc(r?.message||'Verification failed.'),false);
+        const d=r.data||{};
+        if(!d.verified)return show('<strong>Certificate tidak ditemukan.</strong><div class="muted">Pastikan kode verifikasi benar.</div>',false);
+        show('<strong>Certificate verified.</strong><dl><dt>No. Sertifikat</dt><dd>'+esc(d.certificate_number||'-')+'</dd><dt>Nama</dt><dd>'+esc(d.name||'-')+'</dd><dt>Program</dt><dd>'+esc(d.program||'-')+'</dd><dt>Batch</dt><dd>'+esc(d.batch||'-')+'</dd><dt>Tanggal Terbit</dt><dd>'+esc(d.issue_date||'-')+'</dd><dt>Status</dt><dd>'+esc(d.status||'-')+'</dd></dl>',d.status!=='REVOKED');
+      }catch(e){show(esc(e?.message||String(e)),false)}
+    }
+
+    (function(){const p=new URLSearchParams(location.search),c=p.get('code');if(c){document.getElementById('code').value=c;verify();}})();
+  </script>
+</body>
+</html>
