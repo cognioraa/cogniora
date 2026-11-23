@@ -1,3 +1,10 @@
-.vercel
+node_modules/
+.vercel/
 .env
-node_modules
+.env.*
+!.env.example
+.clasp.json
+**/.clasp.json
+.clasprc.json
+**/*recovery*codes*
+.DS_Store
